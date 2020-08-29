@@ -1,0 +1,399 @@
+#!/bin/bash -efu
+# SPDX-License-Identifier: GPL-2.0
+
+PROG="${0##*/}"
+PROGCMD="${PROG#git-}"
+
+message()
+{
+	printf >&2 '%s: %s\n' "$PROG" "$*"
+}
+
+fatal()
+{
+	message "$*"
+	exit 1
+}
+
+valid_patchset()
+{
+	local __n="$2"
+	__n="${__n#refs/}"
+	__n="${__n#heads/}"
+
+	[ -z "${__n##patchset/*}" ] ||
+		fatal "Branch is not a patchset: $2"
+
+	eval "$1=\"\$__n\""
+}
+
+help_line()
+{
+	local i n s
+	i="$1"; shift
+	n="$1"; shift
+	for s in "$@"; do
+		printf "%-${i}s%s\n" "$n" "$s"
+		n=
+	done
+}
+
+cmd_help()
+{
+	case "$__PATCHSET_HELP" in
+		usage) help_line 3 '' \
+			"or: git $PROGCMD help"
+			return ;;
+		descr) help_line 10 help \
+			"Shows this message and exit."
+			return ;;
+	esac
+
+	set -- create new list info export send help
+
+	cat <<-EOF
+	Usage: git $PROGCMD [<command>] [<args>]
+	`for n in "$@"; do __PATCHSET_HELP=usage "cmd_$n"; done`
+
+	This is highlevel utility for easy patchset creation. Patchsets have
+	a version and description.
+
+	Commands:
+
+	`for n in "$@"; do __PATCHSET_HELP=descr "cmd_$n"; done`
+
+	Report bugs to authors.
+
+	EOF
+	exit
+}
+
+show_field_list()
+{
+	local arr i n="$1"
+
+	readarray -t arr <<< $(
+		git config --get-all patchset.$2 ||:;
+		git config --get-all branch.$branchname.$2 ||:;
+	)
+
+	for i in "${!arr[@]}"; do
+		if [ -n "${arr[$i]}" ]; then
+			printf "%-${#1}s %s" "$n" "${arr[$i]}"
+			[ "$i" = "$(( ${#arr[@]} - 1 ))" ] ||
+				printf ','
+			printf '\n'
+			n=
+		fi
+	done
+}
+
+basecommit_for()
+{
+	local merge
+	if ! merge="$(git config "branch.$1.merge")"; then
+		message "Use \`git branch -u <upstream> $1\` to set upstream for branch."
+		fatal "not found upstream for branch: $1"
+	fi
+	git rev-parse --short "$merge"
+}
+
+cmd_list()
+{
+	case "$__PATCHSET_HELP" in
+		usage) help_line 3 '' \
+			"or: git $PROGCMD list"
+			return ;;
+		descr) help_line 10 list \
+			"Shows a list of known patchsets. The current patchset will" \
+			"be marked with an asterisk. The list also shows the base and" \
+			"last commits as well as the number of commits." \
+			""
+			return ;;
+	esac
+
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
+
+	git for-each-ref \
+		--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
+		--sort=refname \
+		'refs/heads/patchset/' |
+	while read -r mark objectname branchname; do
+		basecommit="$(basecommit_for "$branchname")"
+
+		printf '%1s %s..%s %7s %s\n' \
+			"$mark" \
+			"$basecommit" \
+			"$objectname" \
+			"($(git rev-list --count "$basecommit..$objectname"))" \
+			"$branchname"
+	done
+}
+
+cmd_create()
+{
+	case "$__PATCHSET_HELP" in
+		usage) help_line 3 '' \
+			"or: git $PROGCMD create <newname> [<start-point>]"
+			return ;;
+		descr) help_line 10 create \
+			"Creates branch for a new patchset. The new branch will be" \
+			"created with v1 version. The new branch head will point to" \
+			"<start-point> commit or to current commit." \
+			""
+			return ;;
+	esac
+
+	[ "$#" != 0 ] ||
+		fatal "patchset name required"
+
+	local branchname='' startpoint=''
+
+	branchname="$1"
+	shift
+
+	if [ "$#" != 0 ]; then
+		startpoint="$1"
+		shift
+	fi
+
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
+
+	branchname="${branchname#/}"
+
+	[ -n "$branchname" ] ||
+		fatal "empty branch name is not allowed"
+
+	git switch \
+		--create "patchset/$branchname/v1" \
+		--track ${startpoint:+"$startpoint"} ||
+		fatal "unable to create new branch: patchset/$branchname/v1"
+
+	git config \
+		"branch.patchset/$branchname/v1.description" \
+		"*** SUBJECT HERE ***
+
+*** PATCHSET DESCRIPTION HERE ***
+" ||
+		fatal "unable to write empty description for patchset/$branchname/v1"
+
+	git branch --edit-description "patchset/$branchname/v1" ||
+		fatal "unable to change description"
+
+	message "new patchset created: patchset/$branchname/v1"
+}
+
+cmd_new()
+{
+	case "$__PATCHSET_HELP" in
+		usage) help_line 3 '' \
+			"or: git $PROGCMD new [<patchset>] [number]"
+			return ;;
+		descr) help_line 10 new \
+			"Creates branch for a new version of <patchset>. Branch will" \
+			"copy the description and recipient list." \
+			""
+			return ;;
+	esac
+
+	local ver='' branchname='' name
+
+	if [ "$#" != 0 ]; then
+		branchname="$1"
+		shift
+	fi
+
+	if [ "$#" != 0 ]; then
+		ver="$1"
+		shift
+		ver="${ver#v}"
+	fi
+
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
+
+	[ -n "$branchname" ] ||
+		branchname="$(git branch --show-current --format='%(refname)')"
+
+	valid_patchset branchname "$branchname"
+
+	name="${branchname#patchset/}"
+	name="${name%/v*}"
+
+	if [ -z "$ver" ]; then
+		ver="$(git for-each-ref --format='%(refname:lstrip=4)' "refs/heads/patchset/$name/" |
+			sed -e 's/^v//' |
+			sort -n |
+			tail -1)"
+		ver=$(($ver + 1))
+	fi
+
+	git branch -c "$branchname" "patchset/$name/v$ver" ||
+		fatal "unable to copy '$branchname' branch"
+
+	git switch "patchset/$name/v$ver" ||
+		fatal "unable to switch to 'patchset/$name/v$ver'"
+
+	message "new patchset version created: patchset/$name/v$ver"
+}
+
+describe_patchset()
+{
+	local branchname basecommit
+
+	branchname="$1"; shift
+	basecommit="$(basecommit_for "$branchname")"
+
+	show_field_list To: to
+	show_field_list Cc: cc
+	printf 'Subject: [PATCH v%s 0/%s] %s\n\n' \
+		"${branchname##*/v}" \
+		"$(git rev-list --count "$basecommit..$branchname")" \
+		"$(git config "branch.$branchname.description")"
+	printf '%s\n' ---
+	git rev-list --date-order --reverse --abbrev-commit --format=oneline \
+		"$basecommit..$branchname"
+}
+
+cmd_info()
+{
+	case "$__PATCHSET_HELP" in
+		usage) help_line 3 '' \
+			"or: git $PROGCMD info [-e|--edit] [<patchset>]"
+			return ;;
+		descr) help_line 10 info \
+			"Shows or changes the description of the patchset. This description" \
+			"will be used for cover-letter." \
+			""
+			return ;;
+	esac
+
+	local branchname='' mode=list
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			-e|--edit)
+				mode=edit
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
+
+	if [ "$#" != 0 ]; then
+		branchname="$1"
+		shift
+	fi
+
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
+
+	[ -n "$branchname" ] ||
+		branchname="$(git branch --show-current --format='%(refname)')"
+
+	valid_patchset branchname "$branchname"
+
+	case "$mode" in
+		edit)
+			git branch --edit-description "$branchname"
+			;;
+		list)
+			describe_patchset "$branchname"
+			;;
+	esac
+}
+
+cmd_export()
+{
+	case "$__PATCHSET_HELP" in
+		usage) help_line 3 '' \
+			"or: git $PROGCMD export [<patchset>] [<options>]"
+			return ;;
+		descr) help_line 10 export \
+			"Prepares patches for e-mail submission. The <options> will be passed" \
+			"to git-format-patch(1)." \
+			""
+			return ;;
+	esac
+
+	local branchname='' basecommit ver arr
+
+	if [ "$#" != 0 ]; then
+		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
+			branchname="$1"
+			shift
+		fi
+	fi
+
+	[ -n "$branchname" ] ||
+		valid_patchset branchname "$(git branch --show-current --format='%(refname)')"
+
+	arr=()
+	readarray -t arr <<< $(
+		git config --get-all patchset.to ||:;
+		git config --get-all branch.$branchname.to ||:;
+	)
+	for n in "${arr[@]}"; do
+		[ -z "$n" ] ||
+			set -- "$@" "--to=$n"
+	done
+
+	arr=()
+	readarray -t arr <<< $(
+		git config --get-all patchset.cc ||:;
+		git config --get-all branch.$branchname.cc ||:;
+	)
+	for n in "${arr[@]}"; do
+		[ -z "$n" ] ||
+			set -- "$@" "--cc=$n"
+	done
+
+	basecommit="$(basecommit_for "$branchname")"
+	ver="${branchname##*/v}"
+
+	git format-patch -v "$ver" --thread --minimal --cover-from-description=auto \
+		"$@" "$basecommit..$branchname"
+}
+
+cmd_send()
+{
+	case "$__PATCHSET_HELP" in
+		usage) help_line 3 '' \
+			"or: git $PROGCMD send [<options>] <files|directory>"
+			return ;;
+		descr) help_line 10 send \
+			"Sends patches by e-mail. The <options> will be passed" \
+			"to git-send-email(1)." \
+			""
+			return ;;
+	esac
+
+	git send-email --to=' ' --confirm=always --format-patch --suppress-from \
+		"$@"
+}
+
+[ "$#" != 0 ] || set -- list
+cmd="$1"; shift
+
+__PATCHSET_HELP=
+
+case "$cmd" in
+	-h|help)   cmd_help "$@"   ;;
+	cr|create) cmd_create "$@" ;;
+	ex|export) cmd_export "$@" ;;
+	ls|list)   cmd_list "$@"   ;;
+	info)      cmd_info "$@"   ;;
+	new)       cmd_new "$@"    ;;
+	send)      cmd_send "$@"   ;;
+	*)
+		fatal "unknown command: $cmd"
+		;;
+esac
