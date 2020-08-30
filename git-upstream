@@ -1,0 +1,93 @@
+#!/bin/bash -efu
+# SPDX-License-Identifier: GPL-2.0
+
+PROG="${0##*/}"
+
+show_help()
+{
+	cat <<-EOF
+	Usage: $PROG [<option>] [remotename ...]
+
+	Options:
+	   -c, --count=NUM   by default the command shows all refs;
+	   -h, --help        display this help and exit.
+
+	Report bugs to authors.
+
+	EOF
+	exit
+}
+
+message()
+{
+	printf >&2 '%s: %s\n' "$PROG" "$*"
+}
+
+show_usage()
+{
+	[ -z "$*" ] || message "$*"
+	echo "Try \`$PROG --help' for more information." >&2
+	exit 1
+}
+
+TEMP=`getopt -n $PROG -o 'c:h' -l 'count:,help' -- "$@"` ||
+	show_usage
+eval set -- "$TEMP"
+
+count=
+while :; do
+	case "$1" in
+		-c|--count) shift
+			count="$1"
+			;;
+		-h|--help) show_help
+			;;
+		--) shift; break
+			;;
+	esac
+	shift
+done
+
+[ "$#" != 0 ] ||
+	set -- $(git remote)
+
+tty -s &&
+	color=always ||
+	color=auto
+
+ColorRName=
+ColorReset=
+
+if [ "$color" = always ]; then
+	ColorRName="$(git config --get-color "" "green")"
+	ColorReset="$(git config --get-color "" "reset")"
+fi
+
+format=" %(creatordate:iso)"
+format="$format %(color:yellow)%(objectname:short)%(color:reset)"
+format="$format %(refname)"
+
+second=
+for name; do
+	[ -z "$second" ] ||
+		printf '\n'
+
+	printf 'Remote "%s"\n' "${ColorRName}${name}${ColorReset}"
+
+	[ "$count" != 0 ] ||
+		continue
+
+	fetch="$(git config "remote.$name.fetch")"
+	fetch="${fetch#*:}"
+	fetch="${fetch%/*}"
+
+	git for-each-ref \
+			--color="$color" \
+			--format="$format" \
+			--sort='-creatordate' \
+			${count:+--count=$count} \
+			"$fetch/" |
+		tac
+
+	second=1
+done
