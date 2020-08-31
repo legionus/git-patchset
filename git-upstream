@@ -9,8 +9,8 @@ show_help()
 	Usage: $PROG [<option>] [remotename ...]
 
 	Options:
-	   -c, --count=NUM   by default the command shows all refs;
-	   -h, --help        display this help and exit.
+	   -c NUM   by default the command shows all refs;
+	   -h       display this help and exit.
 
 	Report bugs to authors.
 
@@ -26,23 +26,21 @@ message()
 show_usage()
 {
 	[ -z "$*" ] || message "$*"
-	echo "Try \`$PROG --help' for more information." >&2
+	echo "Try \`$PROG -h' for more information." >&2
 	exit 1
 }
 
-TEMP=`getopt -n $PROG -o 'c:h' -l 'count:,help' -- "$@"` ||
-	show_usage
-eval set -- "$TEMP"
-
 count=
-while :; do
-	case "$1" in
-		-c|--count) shift
-			count="$1"
+while getopts c:h o; do
+	case "$o" in
+		c)
+			count="$OPTARG"
 			;;
-		-h|--help) show_help
+		h)
+			show_help
 			;;
-		--) shift; break
+		*)
+			show_usage
 			;;
 	esac
 	shift
