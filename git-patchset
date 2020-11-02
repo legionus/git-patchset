@@ -68,6 +68,15 @@ cmd_help()
 	exit
 }
 
+get_pager()
+{
+	local __get_pager
+	__get_pager="$(git config --get patchset.pager)" ||
+		__get_pager="$(git config --get core.pager)" ||
+		__get_pager="less"
+	eval "$1=\"\$__get_pager\""
+}
+
 show_field_list()
 {
 	local arr i n="$1"
@@ -267,7 +276,7 @@ cmd_info()
 {
 	case "$__PATCHSET_HELP" in
 		usage) help_line 3 '' \
-			"or: git $PROGCMD info [-e|--edit] [<patchset>]"
+			"or: git $PROGCMD info [-e|--edit] [--no-pager] [<patchset>]"
 			return ;;
 		descr) help_line 10 info \
 			"Shows or changes the description of the patchset. This description" \
@@ -276,12 +285,15 @@ cmd_info()
 			return ;;
 	esac
 
-	local branchname='' mode=list
+	local branchname='' mode=list use_pager=1 pager=''
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
 			-e|--edit)
 				mode=edit
+				;;
+			--no-pager)
+				use_pager=
 				;;
 			--)
 				shift
@@ -312,7 +324,12 @@ cmd_info()
 			git branch --edit-description "$branchname"
 			;;
 		list)
-			describe_patchset "$branchname"
+			if [ -n "$use_pager" ] && [ -t 1 ]; then
+				get_pager pager
+				describe_patchset "$branchname" |$pager
+			else
+				describe_patchset "$branchname"
+			fi
 			;;
 	esac
 }
