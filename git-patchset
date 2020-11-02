@@ -241,14 +241,18 @@ cmd_new()
 
 describe_patchset()
 {
-	local branchname basecommit
+	local branchname basecommit subject_prefix
 
 	branchname="$1"; shift
 	basecommit="$(basecommit_for "$branchname")"
 
+	subject_prefix="$(git config --get branch.$branchname.subject-prefix)" ||:
+	subject_prefix="${subject_prefix:+$subject_prefix }PATCH"
+
 	show_field_list To: to
 	show_field_list Cc: cc
-	printf 'Subject: [PATCH v%s 0/%s] %s\n\n' \
+	printf 'Subject: [%s v%s 0/%s] %s\n\n' \
+		"$subject_prefix" \
 		"${branchname##*/v}" \
 		"$(git rev-list --count "$basecommit..$branchname")" \
 		"$(git config "branch.$branchname.description")"
@@ -324,7 +328,7 @@ cmd_export()
 			return ;;
 	esac
 
-	local branchname='' basecommit ver arr
+	local subject_prefix='' branchname='' basecommit ver arr
 
 	if [ "$#" != 0 ]; then
 		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
@@ -355,6 +359,11 @@ cmd_export()
 		[ -z "$n" ] ||
 			set -- "$@" "--cc=$n"
 	done
+
+	if subject_prefix="$(git config --get branch.$branchname.subject-prefix)"; then
+		subject_prefix="${subject_prefix:+$subject_prefix }PATCH"
+		set -- "$@" "--subject-prefix=$subject_prefix"
+	fi
 
 	basecommit="$(basecommit_for "$branchname")"
 	ver="${branchname##*/v}"
