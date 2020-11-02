@@ -267,7 +267,6 @@ describe_patchset()
 		"${branchname##*/v}" \
 		"$(git rev-list --count "$basecommit..$branchname")" \
 		"$(git config "branch.$branchname.description")"
-	printf '%s\n' ---
 	git rev-list --date-order --reverse --abbrev-commit --format=oneline \
 		"$basecommit..$branchname"
 }
