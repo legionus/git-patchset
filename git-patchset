@@ -176,6 +176,8 @@ cmd_create()
 		"*** SUBJECT HERE ***
 
 *** PATCHSET DESCRIPTION HERE ***
+
+--
 " ||
 		fatal "unable to write empty description for patchset/$branchname/v1"
 
