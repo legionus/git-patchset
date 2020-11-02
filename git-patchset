@@ -399,7 +399,8 @@ case "$cmd" in
 	cr|create) cmd_create "$@" ;;
 	ex|export) cmd_export "$@" ;;
 	ls|list)   cmd_list "$@"   ;;
-	info)      cmd_info "$@"   ;;
+	info|cover|cover-letter)
+	           cmd_info "$@"   ;;
 	new)       cmd_new "$@"    ;;
 	send)      cmd_send "$@"   ;;
 	*)
