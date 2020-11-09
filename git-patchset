@@ -4,6 +4,10 @@
 PROG="${0##*/}"
 PROGCMD="${PROG#git-}"
 
+[ -t 1 ] &&
+	color=always ||
+	color=none
+
 message()
 {
 	printf >&2 '%s: %s\n' "$PROG" "$*"
@@ -141,6 +145,15 @@ cmd_list()
 	[ "$#" = 0 ] ||
 		fatal "too many arguments"
 
+	local ColorRange='' ColorReset='' ColorCurrent='' ColorDefault=''
+
+	if [ "$color" = always ]; then
+		ColorDefault="$(git config --get-color "" "white")"
+		ColorCurrent="$(git config --get-color "" "bold")"
+		ColorRange="$(  git config --get-color "" "yellow")"
+		ColorReset="$(  git config --get-color "" "reset")"
+	fi
+
 	{
 		git for-each-ref \
 			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
@@ -158,12 +171,16 @@ cmd_list()
 
 			basecommit="$(basecommit_for "$branchname")"
 
-			printf '%1s %s..%s %7s %s\n' \
-				"$mark" \
-				"$basecommit" \
-				"$objectname" \
+			[ "$mark" = '*' ] &&
+				current="$ColorCurrent" ||
+				current=''
+
+			printf '%1s %s..%s %7s %s%s\n' \
+				"${current}${ColorDefault}${mark}" \
+				"${ColorRange}${basecommit}" \
+				"${objectname}${ColorDefault}" \
 				"($(git rev-list --count "$basecommit..$objectname"))" \
-				"$branchname"
+				"${branchname}${ColorReset}"
 			break
 		done
 
