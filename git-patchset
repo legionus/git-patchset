@@ -371,7 +371,7 @@ cmd_export()
 {
 	case "$__PATCHSET_HELP" in
 		usage) help_line 3 '' \
-			"or: git $PROGCMD export [<patchset>] [<options>]"
+			"or: git $PROGCMD export [--resend] [--rfc] [<patchset>] [<options>]"
 			return ;;
 		descr) help_line 10 export \
 			"Prepares patches for e-mail submission. The <options> will be passed" \
@@ -381,6 +381,26 @@ cmd_export()
 	esac
 
 	local subject_prefix='' branchname='' basecommit ver arr
+	local resend='' rfc=''
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			--resend)
+				resend=RESEND
+				;;
+			--rfc)
+				rfc=RFC
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
 
 	if [ "$#" != 0 ]; then
 		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
@@ -412,10 +432,18 @@ cmd_export()
 			set -- "$@" "--cc=$n"
 	done
 
-	if subject_prefix="$(git config --get branch.$branchname.subject-prefix)"; then
-		subject_prefix="${subject_prefix:+$subject_prefix }PATCH"
-		set -- "$@" "--subject-prefix=$subject_prefix"
-	fi
+	arr=()
+	readarray -t arr <<< $(
+		echo $resend $rfc;
+		git config --get branch.$branchname.subject-prefix ||:;
+		echo PATCH;
+	)
+	for n in "${arr[@]}"; do
+		[ -z "$n" ] ||
+			subject_prefix="${subject_prefix:+$subject_prefix }$n"
+	done
+
+	set -- "$@" "--subject-prefix=$subject_prefix"
 
 	basecommit="$(basecommit_for "$branchname")"
 	ver="${branchname##*/v}"
