@@ -111,7 +111,7 @@ cmd_list()
 {
 	case "$__PATCHSET_HELP" in
 		usage) help_line 3 '' \
-			"or: git $PROGCMD list"
+			"or: git $PROGCMD list [--all|--latest]"
 			return ;;
 		descr) help_line 10 list \
 			"Shows a list of known patchsets. The current patchset will" \
@@ -121,22 +121,54 @@ cmd_list()
 			return ;;
 	esac
 
+	local mode='all'
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			--all)
+				mode=all
+				;;
+			--latest)
+				mode=latest
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
+
 	[ "$#" = 0 ] ||
 		fatal "too many arguments"
 
-	git for-each-ref \
-		--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
-		--sort=refname \
-		'refs/heads/patchset/' |
-	while read -r mark objectname branchname; do
-		basecommit="$(basecommit_for "$branchname")"
+	{
+		git for-each-ref \
+			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
+			--sort=refname \
+			'refs/heads/patchset/'
+		printf '\n'
+	} |
+	while read -r on_mark on_objectname on_branchname; do
+		while [ -n "${branchname-}" ]; do
+			[ "$mode" = 'all' ] ||
+				[ "${prev_patchset:-${on_branchname%/v*}}" != "${on_branchname%/v*}" ] ||
+				break
 
-		printf '%1s %s..%s %7s %s\n' \
-			"$mark" \
-			"$basecommit" \
-			"$objectname" \
-			"($(git rev-list --count "$basecommit..$objectname"))" \
-			"$branchname"
+			basecommit="$(basecommit_for "$branchname")"
+
+			printf '%1s %s..%s %7s %s\n' \
+				"$mark" \
+				"$basecommit" \
+				"$objectname" \
+				"($(git rev-list --count "$basecommit..$objectname"))" \
+				"$branchname"
+			break
+		done
+
+		mark="$on_mark"
+		objectname="$on_objectname"
+		branchname="$on_branchname"
+		prev_patchset="${on_branchname%/v*}"
 	done
 }
 
@@ -407,7 +439,7 @@ cmd_send()
 		"$@"
 }
 
-[ "$#" != 0 ] || set -- list
+[ "$#" != 0 ] || set -- list --latest
 cmd="$1"; shift
 
 __PATCHSET_HELP=
