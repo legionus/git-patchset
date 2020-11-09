@@ -149,9 +149,11 @@ cmd_list()
 		printf '\n'
 	} |
 	while read -r on_mark on_objectname on_branchname; do
+		on_patchset="${on_branchname%/v*}"
+
 		while [ -n "${branchname-}" ]; do
 			[ "$mode" = 'all' ] ||
-				[ "${prev_patchset:-${on_branchname%/v*}}" != "${on_branchname%/v*}" ] ||
+				[ "${prev_patchset:-$on_patchset}" != "$on_patchset" ] ||
 				break
 
 			basecommit="$(basecommit_for "$branchname")"
@@ -168,7 +170,7 @@ cmd_list()
 		mark="$on_mark"
 		objectname="$on_objectname"
 		branchname="$on_branchname"
-		prev_patchset="${on_branchname%/v*}"
+		prev_patchset="$on_patchset"
 	done
 }
 
