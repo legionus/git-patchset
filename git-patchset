@@ -86,6 +86,7 @@ cmd_help()
 			printf "%-10s%s\n" "$n" "$s"
 			n=
 		done
+		printf '\n'
 	done`
 
 	Report bugs to authors.
