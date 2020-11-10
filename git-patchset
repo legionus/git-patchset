@@ -516,6 +516,9 @@ cmd_send()
 			return ;;
 	esac
 
+	git --list-cmds=main | grep -qs send-email ||
+		fatal "git-send-email(1) not found"
+
 	git send-email --to=' ' --confirm=always --format-patch --suppress-from \
 		"$@"
 }
