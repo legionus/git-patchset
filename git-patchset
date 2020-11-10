@@ -26,9 +26,23 @@ valid_patchset()
 	__n="${__n#heads/}"
 
 	[ -z "${__n##patchset/*}" ] ||
-		fatal "Branch is not a patchset: $2"
+		fatal "branch is not a patchset: $2"
 
 	eval "$1=\"\$__n\""
+}
+
+current_patchset()
+{
+	local __v
+	__v="$(git branch --show-current --format='%(refname)')" ||
+		fatal "unable to obtain current branch name"
+	valid_patchset "$1" "$__v"
+}
+
+branch_exists()
+{
+	git rev-parse "$1" >/dev/null 2>&1 ||
+		fatal "unknown branch: $1"
 }
 
 cmd_help()
@@ -304,7 +318,7 @@ cmd_new()
 		fatal "too many arguments"
 
 	[ -n "$branchname" ] ||
-		branchname="$(git branch --show-current --format='%(refname)')"
+		current_patchset branchname
 
 	valid_patchset branchname "$branchname"
 
@@ -396,9 +410,10 @@ cmd_info()
 		fatal "too many arguments"
 
 	[ -n "$branchname" ] ||
-		branchname="$(git branch --show-current --format='%(refname)')"
+		current_patchset branchname
 
 	valid_patchset branchname "$branchname"
+	branch_exists "$branchname"
 
 	case "$mode" in
 		edit)
@@ -462,7 +477,10 @@ cmd_export()
 	fi
 
 	[ -n "$branchname" ] ||
-		valid_patchset branchname "$(git branch --show-current --format='%(refname)')"
+		current_patchset branchname
+
+	valid_patchset branchname "$branchname"
+	branch_exists "$branchname"
 
 	arr=()
 	readarray -t arr <<< $(
@@ -527,7 +545,9 @@ cmd_send()
 		fatal "git-send-email(1) not found"
 
 	if [ -n "$auto_export" ]; then
-		local gitdir
+		local gitdir branchname=''
+
+		current_patchset branchname
 
 		gitdir="$(git rev-parse --absolute-git-dir)" ||
 			fatal "unable to find git directory"
@@ -538,7 +558,7 @@ cmd_send()
 			fatal "unable to create temporary directory: $gitdir/patchset"
 		fi
 
-		set -- `cmd_export -o "$gitdir/patchset"`
+		set -- `cmd_export "$branchname" -o "$gitdir/patchset"`
 	fi
 
 	local rc=0
