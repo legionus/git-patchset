@@ -506,21 +506,48 @@ cmd_export()
 cmd_send()
 {
 	case "$__PATCHSET_HELP" in
-		usage) printf '[<options>] <files|directory>\n'
+		usage) printf '[[<options>] <files|directory>]\n'
 			return ;;
 		descr) printf '%s\n' \
 			"Sends patches by e-mail. The <options> will be passed" \
-			"to git-send-email(1)."
+			"to git-send-email(1). Without any options, the command" \
+			"will export current patchset itself."
 			return ;;
 		options)
 			return ;;
 	esac
 
+	local auto_export=''
+
+	[ "$#" != 0 ] ||
+		auto_export=1
+
 	git --list-cmds=main | grep -qs send-email ||
 		fatal "git-send-email(1) not found"
 
+	if [ -n "$auto_export" ]; then
+		local gitdir
+
+		gitdir="$(git rev-parse --absolute-git-dir)" ||
+			fatal "unable to find git directory"
+
+		if ! mkdir -- "$gitdir/patchset" 2>/dev/null; then
+			[ ! -d "$gitdir/patchset" ] ||
+				fatal "another git-patchset-send(1) in progress"
+			fatal "unable to create temporary directory: $gitdir/patchset"
+		fi
+
+		set -- `cmd_export -o "$gitdir/patchset"`
+	fi
+
+	local rc=0
 	git send-email --to=' ' --confirm=always --format-patch --suppress-from \
-		"$@"
+		"$@" || rc=$?
+
+	[ -z "$auto_export" ] ||
+		rm -rf -- "$gitdir/patchset" ||:
+
+	return $rc
 }
 
 [ "$#" != 0 ] || set -- list --latest
