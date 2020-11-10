@@ -45,6 +45,15 @@ branch_exists()
 		fatal "unknown branch: $1"
 }
 
+builtin_cat()
+{
+	local s eof=
+	while [ -z "$eof" ]; do
+		read -N 1 s || eof=1
+		printf '%s' "$s"
+	done
+}
+
 cmd_help()
 {
 	case "$__PATCHSET_HELP" in
@@ -68,7 +77,7 @@ cmd_help()
 		done
 		[ -n "$found" ] ||
 			fatal "unknown command: $cmd"
-		cat <<-EOF
+		builtin_cat <<-EOF
 		Usage: git $PROGCMD $cmd `__PATCHSET_HELP=usage "cmd_$cmd"`
 
 		`
@@ -82,7 +91,7 @@ cmd_help()
 		exit
 	fi
 
-	cat <<-EOF
+	builtin_cat <<-EOF
 	Usage: git $PROGCMD [<command>] [<args>]
 	`for n in "$@"; do
 		printf '   or: git %s %s ' "$PROGCMD" "$n"
@@ -541,24 +550,25 @@ cmd_send()
 	[ "$#" != 0 ] ||
 		auto_export=1
 
-	git --list-cmds=main | grep -qs send-email ||
-		fatal "git-send-email(1) not found"
+	git --list-cmds=main |
+		while read -r n; do [ "$n" != 'send-email' ] || exit 1; done &&
+		fatal "git-send-email(1) not found" ||:
+
+	local dir branchname
+	current_patchset branchname
 
 	if [ -n "$auto_export" ]; then
-		local gitdir branchname=''
-
-		current_patchset branchname
-
-		gitdir="$(git rev-parse --absolute-git-dir)" ||
+		dir="$(git rev-parse --absolute-git-dir; false)/$PROGCMD-send" ||
 			fatal "unable to find git directory"
+		set -- "$dir"
 
-		if ! mkdir -- "$gitdir/patchset" 2>/dev/null; then
-			[ ! -d "$gitdir/patchset" ] ||
-				fatal "another git-patchset-send(1) in progress"
-			fatal "unable to create temporary directory: $gitdir/patchset"
+		if ! mkdir -- "$1" >/dev/null 2>&1; then
+			[ -d "$1" ] ||
+				fatal "unable to create temporary directory: $1"
+			fatal "another git-$PROGCMD-send(1) in progress"
 		fi
 
-		set -- `cmd_export "$branchname" -o "$gitdir/patchset"`
+		cmd_export "$branchname" -o "$1" >/dev/null
 	fi
 
 	local rc=0
@@ -566,7 +576,7 @@ cmd_send()
 		"$@" || rc=$?
 
 	[ -z "$auto_export" ] ||
-		rm -rf -- "$gitdir/patchset" ||:
+		rm -rf -- "$1" ||:
 
 	return $rc
 }
