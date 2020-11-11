@@ -368,6 +368,9 @@ describe_patchset()
 	subject_prefix="$(git config --get branch.$branchname.subject-prefix)" ||:
 	subject_prefix="${subject_prefix:+$subject_prefix }PATCH"
 
+	printf 'From %s %s\n' \
+		"$(git config --get user.email)" \
+		"$(LANG=C date -u)" ||:
 	show_field_list To: to
 	show_field_list Cc: cc
 	printf 'Subject: [%s v%s 0/%s] %s\n\n' \
