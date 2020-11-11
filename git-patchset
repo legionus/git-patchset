@@ -19,16 +19,35 @@ fatal()
 	exit 1
 }
 
-valid_patchset()
+parse_patchset()
 {
-	local __n="$2"
+	local __v='' __n="$1"
+
 	__n="${__n#refs/}"
 	__n="${__n#heads/}"
 
 	[ -z "${__n##patchset/*}" ] ||
-		fatal "branch is not a patchset: $2"
+		fatal "branch is not a patchset: $1"
+	shift
 
 	eval "$1=\"\$__n\""
+	shift
+
+	[ "$#" != 0 ] || return 0
+
+	[ -n "${__n##*/[av][0-9]*}" ] ||
+		__v="${__n##*/[av]}"
+
+	__n="${__n#patchset/}"
+	__n="${__n%/[av]$__v}"
+
+	eval "$1=\"\$__n\""
+	shift
+
+	[ "$#" != 0 ] || return 0
+
+	eval "$1=\"\$__v\""
+	shift
 }
 
 current_patchset()
@@ -36,7 +55,7 @@ current_patchset()
 	local __v
 	__v="$(git branch --show-current --format='%(refname)')" ||
 		fatal "unable to obtain current branch name"
-	valid_patchset "$1" "$__v"
+	parse_patchset "$__v" "$@"
 }
 
 branch_exists()
@@ -279,6 +298,7 @@ cmd_create()
 		fatal "too many arguments"
 
 	branchname="${branchname#/}"
+	branchname="${branchname%/}"
 
 	[ -n "$branchname" ] ||
 		fatal "empty branch name is not allowed"
@@ -317,45 +337,46 @@ cmd_new()
 			return ;;
 	esac
 
-	local ver='' branchname='' name
+	local newname='' newver='' branchname='' name='' ver=''
 
 	if [ "$#" != 0 ]; then
+		branch_exists "$1"
 		branchname="$1"
 		shift
 	fi
 
 	if [ "$#" != 0 ]; then
-		ver="$1"
+		newver="${1#[av]}"
 		shift
-		ver="${ver#v}"
 	fi
 
 	[ "$#" = 0 ] ||
 		fatal "too many arguments"
 
-	[ -n "$branchname" ] ||
-		current_patchset branchname
+	[ -n "$branchname" ] &&
+		parse_patchset "$branchname" branchname name ver ||
+		current_patchset branchname name ver
 
-	valid_patchset branchname "$branchname"
-
-	name="${branchname#patchset/}"
-	name="${name%/[av]*}"
-
-	if [ -z "$ver" ]; then
-		ver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$name/" |
+	if [ -z "$newver" ]; then
+		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$bname/" |
 			sed -e 's/^.*\/[av]//' |
 			sort -n |
 			tail -1)"
-		ver=$(($ver + 1))
+		newver=$(($newver + 1))
 	fi
 
-	git branch -c "$branchname" "patchset/$name/v$ver" ||
+	newname="patchset/$name/v$newver"
+
+	! branch_exists "$newname" ||
+		fatal "$newname: branch already exists"
+
+	git branch -c "$branchname" "$newname" ||
 		fatal "unable to copy '$branchname' branch"
 
-	git switch "patchset/$name/v$ver" ||
-		fatal "unable to switch to 'patchset/$name/v$ver'"
+	git switch "$newname" ||
+		fatal "unable to switch to '$newname'"
 
-	message "new patchset version created: patchset/$name/v$ver"
+	message "new patchset version created: $newname"
 }
 
 describe_patchset()
@@ -399,7 +420,7 @@ cmd_info()
 			return ;;
 	esac
 
-	local branchname='' mode=list use_pager=1 pager=''
+	local branchname='' name='' ver='' mode=list use_pager=1 pager=''
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -421,6 +442,7 @@ cmd_info()
 	done
 
 	if [ "$#" != 0 ]; then
+		branch_exists "$1"
 		branchname="$1"
 		shift
 	fi
@@ -428,11 +450,12 @@ cmd_info()
 	[ "$#" = 0 ] ||
 		fatal "too many arguments"
 
-	[ -n "$branchname" ] ||
-		current_patchset branchname
+	[ -n "$branchname" ] &&
+		parse_patchset "$branchname" branchname name ver ||
+		current_patchset branchname name ver
 
-	valid_patchset branchname "$branchname"
-	branch_exists "$branchname"
+	[ -n "$name" ] && [ -n "$ver" ] ||
+		fatal "unable to parse patchset"
 
 	case "$mode" in
 		edit)
@@ -466,7 +489,7 @@ cmd_export()
 			return ;;
 	esac
 
-	local subject_prefix='' branchname='' basecommit ver arr
+	local subject_prefix='' branchname='' basecommit name ver arr
 	local resend='' rfc=''
 
 	while [ "$#" != 0 ]; do
@@ -495,11 +518,12 @@ cmd_export()
 		fi
 	fi
 
-	[ -n "$branchname" ] ||
-		current_patchset branchname
+	[ -n "$branchname" ] &&
+		parse_patchset "$branchname" branchname name ver ||
+		current_patchset branchname name ver
 
-	valid_patchset branchname "$branchname"
-	branch_exists "$branchname"
+	[ -n "$name" ] && [ -n "$ver" ] ||
+		fatal "unable to parse patchset"
 
 	arr=()
 	readarray -t arr <<< $(
@@ -535,7 +559,6 @@ cmd_export()
 	set -- "$@" "--subject-prefix=$subject_prefix"
 
 	basecommit="$(basecommit_for "$branchname")"
-	ver="${branchname##*/v}"
 
 	git format-patch -v "$ver" --thread --minimal --cover-from-description=auto \
 		"$@" "$basecommit..$branchname"
@@ -564,10 +587,10 @@ cmd_send()
 		while read -r n; do [ "$n" != 'send-email' ] || exit 1; done &&
 		fatal "git-send-email(1) not found" ||:
 
-	local dir branchname
-	current_patchset branchname
-
 	if [ -n "$auto_export" ]; then
+		local dir branchname
+		current_patchset branchname
+
 		dir="$(git rev-parse --absolute-git-dir; false)/$PROGCMD-send" ||
 			fatal "unable to find git directory"
 		set -- "$dir"
@@ -642,23 +665,30 @@ cmd_archive()
 	[ "$#" = 0 ] ||
 		fatal "too many arguments"
 
-	[ -n "$branchname" ] ||
-		current_patchset branchname
+	[ -n "$branchname" ] &&
+		parse_patchset "$branchname" branchname bname bver ||
+		current_patchset branchname bname bver
 
-	valid_patchset branchname "$branchname"
-
-	[ -n "${branchname##*/[av]*}" ] ||
-		branchname="${branchname%/[av]*}"
+	[ -z "$bver" ] ||
+		message "WARNING: You have specified the version number but the entire patchset will be archived"
 
 	git for-each-ref --format='%(refname:lstrip=2)' \
-		"refs/heads/$branchname/$ver[0-9]*" |
-	while read -r name; do
-		num="${name##*/$ver}"
-		newname="${name%/$ver*}/$new${name##*/$ver}"
+		"refs/heads/patchset/$bname/$ver[0-9]*" |
+	while :; do
+		read -r name ||:
 
-		git branch -M "$name" "$newname"
+		if [ -z "$name" ]; then
+			[ -n "${found-}" ] ||
+				message "patchset/$bname: patchset not found."
+			break
+		fi
 
-		message "${name%/$ver*}/$ver$num -> patchset/../$new$num"
+		parse_patchset "$name" _ _ num
+
+		git branch -M "$name" "patchset/$bname/$new$num"
+
+		message "patchset/$bname/$ver$num -> patchset/../$new$num"
+		found=1
 	done
 }
 
