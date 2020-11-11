@@ -69,7 +69,7 @@ cmd_help()
 	local n cmd= found=
 	[ "$#" = 0 ] || cmd="$1"
 
-	set -- create new list info export send help
+	set -- create new list info export send archive help
 
 	if [ -n "$cmd" ]; then
 		for n in "$@"; do
@@ -160,7 +160,7 @@ basecommit_for()
 cmd_list()
 {
 	case "$__PATCHSET_HELP" in
-		usage) printf '[--all|--latest]\n'
+		usage) printf '[--all|--latest] [--archive]\n'
 			return ;;
 		descr) printf '%s\n' \
 			"Shows a list of known patchsets. The current patchset will" \
@@ -170,12 +170,13 @@ cmd_list()
 		options) printf '%s\n' \
 			"" \
 			"Options:" \
-			"  --all     show all versions of all patchsets." \
-			"  --latest  show only latest versions of patchsets."
+			"  --all      show all versions of all patchsets." \
+			"  --latest   show only latest versions of patchsets."
+			"  --archive  show archived patchsets"
 			return ;;
 	esac
 
-	local mode='all'
+	local mode='' ver=v
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -185,12 +186,18 @@ cmd_list()
 			--latest)
 				mode=latest
 				;;
+			--archive)
+				mode="${mode:-latest}"
+				ver=a
+				;;
 			*)
 				break
 				;;
 		esac
 		shift
 	done
+
+	mode="${mode:-all}"
 
 	[ "$#" = 0 ] ||
 		fatal "too many arguments"
@@ -208,11 +215,11 @@ cmd_list()
 		git for-each-ref \
 			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
 			--sort=refname \
-			'refs/heads/patchset/'
+			"refs/heads/patchset/*/$ver[0-9]*"
 		printf '\n'
 	} |
 	while read -r on_mark on_objectname on_branchname; do
-		on_patchset="${on_branchname%/v*}"
+		on_patchset="${on_branchname%/$ver*}"
 
 		while [ -n "${branchname-}" ]; do
 			[ "$mode" = 'all' ] ||
@@ -332,11 +339,11 @@ cmd_new()
 	valid_patchset branchname "$branchname"
 
 	name="${branchname#patchset/}"
-	name="${name%/v*}"
+	name="${name%/[av]*}"
 
 	if [ -z "$ver" ]; then
-		ver="$(git for-each-ref --format='%(refname:lstrip=4)' "refs/heads/patchset/$name/" |
-			sed -e 's/^v//' |
+		ver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$name/" |
+			sed -e 's/^.*\/[av]//' |
 			sort -n |
 			tail -1)"
 		ver=$(($ver + 1))
@@ -365,7 +372,7 @@ describe_patchset()
 	show_field_list Cc: cc
 	printf 'Subject: [%s v%s 0/%s] %s\n\n' \
 		"$subject_prefix" \
-		"${branchname##*/v}" \
+		"${branchname##*/[av]}" \
 		"$(git rev-list --count "$basecommit..$branchname")" \
 		"$(git config "branch.$branchname.description")"
 	git rev-list --date-order --reverse --abbrev-commit --format=oneline \
@@ -581,20 +588,92 @@ cmd_send()
 	return $rc
 }
 
+cmd_archive()
+{
+	case "$__PATCHSET_HELP" in
+		usage) printf '[--add|--restore] [<patchset>]\n'
+			return ;;
+		descr) printf '%s\n' \
+			"Archive or unarchive the patchset. The specified version will be "\
+			"ignored. The archived patchset is not listed by default."
+			return ;;
+		options) printf '%s\n' \
+			"" \
+			"Options:" \
+			"  -a, --add       Move all versions of patchset to archive." \
+			"  -r, --restore   Restore all versions of patchset."
+			return ;;
+	esac
+
+	local ver=v new='' branchname=''
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			-a|--add)
+				ver=v
+				;;
+			-r|--restore)
+				ver=a
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
+
+	case "$ver" in
+		a) new=v ;;
+		v) new=a ;;
+	esac
+
+	if [ "$#" != 0 ]; then
+		branchname="$1"
+		shift
+	fi
+
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
+
+	[ -n "$branchname" ] ||
+		current_patchset branchname
+
+	valid_patchset branchname "$branchname"
+
+	[ -n "${branchname##*/[av]*}" ] ||
+		branchname="${branchname%/[av]*}"
+
+	git for-each-ref --format='%(refname:lstrip=2)' \
+		"refs/heads/$branchname/$ver[0-9]*" |
+	while read -r name; do
+		num="${name##*/$ver}"
+		newname="${name%/$ver*}/$new${name##*/$ver}"
+
+		git branch -M "$name" "$newname"
+
+		message "${name%/$ver*}/$ver$num -> patchset/../$new$num"
+	done
+}
+
 [ "$#" != 0 ] || set -- list --latest
 cmd="$1"; shift
 
 __PATCHSET_HELP=
 
 case "$cmd" in
-	-h|help)   cmd_help "$@"   ;;
-	cr|create) cmd_create "$@" ;;
-	ex|export) cmd_export "$@" ;;
-	ls|list)   cmd_list "$@"   ;;
+	-h|help)   cmd_help "$@"      ;;
+	cr|create) cmd_create "$@"    ;;
+	ex|export) cmd_export "$@"    ;;
+	ls|list)   cmd_list "$@"      ;;
 	info|cover|cover-letter)
-	           cmd_info "$@"   ;;
-	new)       cmd_new "$@"    ;;
-	send)      cmd_send "$@"   ;;
+	           cmd_info "$@"      ;;
+	new)       cmd_new "$@"       ;;
+	send)      cmd_send "$@"      ;;
+	archive)   cmd_archive "$@"   ;;
 	*)
 		fatal "unknown command: $cmd"
 		;;
