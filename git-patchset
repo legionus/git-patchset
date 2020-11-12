@@ -179,7 +179,7 @@ basecommit_for()
 cmd_list()
 {
 	case "$__PATCHSET_HELP" in
-		usage) printf '[--all|--latest] [--archive]\n'
+		usage) printf '[--all|--latest|--versions] [--archive]\n'
 			return ;;
 		descr) printf '%s\n' \
 			"Shows a list of known patchsets. The current patchset will" \
@@ -189,9 +189,10 @@ cmd_list()
 		options) printf '%s\n' \
 			"" \
 			"Options:" \
-			"  --all      show all versions of all patchsets." \
-			"  --latest   show only latest versions of patchsets." \
-			"  --archive  show archived patchsets"
+			"  --all        show all versions of all patchsets." \
+			"  --latest     show only latest versions of patchsets." \
+			"  --versions   show all versions of current patchset." \
+			"  --archive    show archived patchsets"
 			return ;;
 	esac
 
@@ -199,11 +200,8 @@ cmd_list()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
-			--all)
-				mode=all
-				;;
-			--latest)
-				mode=latest
+			--all|--latest|--versions)
+				mode="${1#--}"
 				;;
 			--archive)
 				mode="${mode:-latest}"
@@ -231,17 +229,20 @@ cmd_list()
 	fi
 
 	{
+		name='*'
+		[ "$mode" != 'versions' ] ||
+			current_patchset _ name
 		git for-each-ref \
 			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
 			--sort=refname \
-			"refs/heads/patchset/*/$ver[0-9]*"
+			"refs/heads/patchset/$name/$ver[0-9]*"
 		printf '\n'
 	} |
 	while read -r on_mark on_objectname on_branchname; do
 		on_patchset="${on_branchname%/$ver*}"
 
 		while [ -n "${branchname-}" ]; do
-			[ "$mode" = 'all' ] ||
+			[ "$mode" = 'all' ] || [ "$mode" = 'versions' ] ||
 				[ "${prev_patchset:-$on_patchset}" != "$on_patchset" ] ||
 				break
 
