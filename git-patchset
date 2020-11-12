@@ -406,21 +406,28 @@ describe_patchset()
 cmd_info()
 {
 	case "$__PATCHSET_HELP" in
-		usage) printf '[-e|--edit] [--no-pager] [<patchset>]\n'
+		usage) printf '[-e|--edit] [--no-pager] [--global] [--to=<email>] [--cc=<email>] [<patchset>]\n'
 			return ;;
 		descr) printf '%s\n' \
 			"Shows or changes the description of the patchset. This description" \
-			"will be used for cover-letter."
+			"will be used for cover-letter. You can always change or delete To" \
+			"and Cc fields using the \`git config -e'."
 			return ;;
 		options) printf '%s\n' \
 			"" \
 			"Options:" \
-			"  -e,--edit   open editor to change the description." \
-			"  --no-pager  do not pipe git output into a pager."
+			"  -e,--edit      open editor to change the description." \
+			"  --to=<email>   add a To: header to the email headers." \
+			"  --cc=<email>   add a Cc: header to the email headers." \
+			"  --global       add <email> globally for all patchsets." \
+			"  --no-pager     do not pipe git output into a pager."
 			return ;;
 	esac
 
 	local branchname='' name='' ver='' mode=list use_pager=1 pager=''
+	local to cc cfg_prefix=''
+
+	to=(); cc=();
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -429,6 +436,17 @@ cmd_info()
 				;;
 			--no-pager)
 				use_pager=
+				;;
+			--global)
+				cfg_prefix="patchset"
+				;;
+			--to=*)
+				to+=("${1#--to=}")
+				mode=tocc
+				;;
+			--cc=*)
+				cc+=("${1#--cc=}")
+				mode=tocc
 				;;
 			--)
 				shift
@@ -457,6 +475,50 @@ cmd_info()
 	[ -n "$name" ] && [ -n "$ver" ] ||
 		fatal "unable to parse patchset"
 
+	if [ -n "$cfg_prefix" ]; then
+		[ "$mode" != 'edit' ] ||
+			fatal "options --edit and --global are mutually exclusive"
+		[ "$mode" != 'list' ] ||
+			fatal "option --global is useless for viewing the description"
+	fi
+
+	if [ "${#to[@]}" != 0 ] || [ "${#cc[@]}" != 0 ]; then
+		local cc_nr=0 to_nr=0 arr
+
+		arr=()
+		readarray -t arr <<< $(
+			git config --get-all patchset.to ||:;
+			git config --get-all patchset.cc ||:;
+		)
+		if [ -z "$cfg_prefix" ]; then
+			readarray -O "${#arr[@]}" -t arr <<< $(
+				git config --get-all branch.$branchname.to ||:;
+				git config --get-all branch.$branchname.cc ||:;
+			)
+			cfg_prefix="branch.$branchname"
+		fi
+
+		add_recipient()
+		{
+			local field counter a n
+			field="$1"; shift
+			counter="$1"; shift
+			for a in "$@"; do
+				for n in "${arr[@]}" ; do
+					if [ "$n" = "$a" ]; then
+						message "address already exists: $n"
+						continue 2
+					fi
+				done
+				git config --add "$cfg_prefix.$field" "$a"
+				eval "$counter=\$((\$$counter + 1))"
+			done
+		}
+
+		add_recipient to to_nr "${to[@]}"
+		add_recipient cc cc_nr "${cc[@]}"
+	fi
+
 	case "$mode" in
 		edit)
 			git branch --edit-description "$branchname"
@@ -468,6 +530,10 @@ cmd_info()
 			else
 				describe_patchset "$branchname"
 			fi
+			;;
+		tocc)
+			[ "${#to[@]}" = 0 ] || message "added $to_nr new addresses to \`To' list"
+			[ "${#cc[@]}" = 0 ] || message "added $cc_nr new addresses to \`Cc' list"
 			;;
 	esac
 }

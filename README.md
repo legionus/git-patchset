@@ -8,7 +8,7 @@ Usage: git patchset [<command>] [<args>]
    or: git patchset create <newname> [<start-point>]
    or: git patchset new [<patchset>] [number]
    or: git patchset list [--all|--latest] [--archive]
-   or: git patchset info [-e|--edit] [--no-pager] [<patchset>]
+   or: git patchset info [-e|--edit] [--no-pager] [--global] [--to=<email>] [--cc=<email>] [<patchset>]
    or: git patchset export [--resend] [--rfc] [<patchset>] [<options>]
    or: git patchset send [[<options>] <files|directory>]
    or: git patchset archive [--add|--restore] [<patchset>]
@@ -31,7 +31,8 @@ list      Shows a list of known patchsets. The current patchset will
           last commits as well as the number of commits.
 
 info      Shows or changes the description of the patchset. This description
-          will be used for cover-letter.
+          will be used for cover-letter. You can always change or delete To
+          and Cc fields using the `git config -e'.
 
 export    Prepares patches for e-mail submission. The <options> will be passed
           to git-format-patch(1).
