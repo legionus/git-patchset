@@ -190,7 +190,7 @@ cmd_list()
 			"" \
 			"Options:" \
 			"  --all      show all versions of all patchsets." \
-			"  --latest   show only latest versions of patchsets."
+			"  --latest   show only latest versions of patchsets." \
 			"  --archive  show archived patchsets"
 			return ;;
 	esac
