@@ -88,7 +88,7 @@ cmd_help()
 	local n cmd= found=
 	[ "$#" = 0 ] || cmd="$1"
 
-	set -- create new list info export send archive help
+	set -- create new list info log export send archive help
 
 	if [ -n "$cmd" ]; then
 		for n in "$@"; do
@@ -759,6 +759,38 @@ cmd_archive()
 	done
 }
 
+cmd_log()
+{
+	case "$__PATCHSET_HELP" in
+		usage) printf '[<patchset>] [options]\n'
+			return ;;
+		descr) printf '%s\n' \
+			"Shortcut for git-log(1) to display patchset changes. The <options>"\
+			" will be passed to git-log(1). Without any options, the command will" \
+			"show changes in the current patchset."
+			return ;;
+		options)
+			return ;;
+	esac
+
+	local branchname=''
+
+	if [ "$#" != 0 ]; then
+		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
+			branchname="$1"
+			shift
+		fi
+	fi
+
+	[ -n "$branchname" ] &&
+		parse_patchset "$branchname" branchname ||
+		current_patchset branchname
+
+	basecommit="$(basecommit_for "$branchname")"
+
+	git log "$@" "$basecommit..$branchname"
+}
+
 [ "$#" != 0 ] || set -- list --latest
 cmd="$1"; shift
 
@@ -772,6 +804,7 @@ case "$cmd" in
 	info|cover|cover-letter)
 	           cmd_info "$@"      ;;
 	new)       cmd_new "$@"       ;;
+	log)       cmd_log "$@"       ;;
 	send)      cmd_send "$@"      ;;
 	archive)   cmd_archive "$@"   ;;
 	*)
