@@ -58,12 +58,6 @@ current_patchset()
 	parse_patchset "$__v" "$@"
 }
 
-branch_exists()
-{
-	git rev-parse "$1" >/dev/null 2>&1 ||
-		fatal "unknown branch: $1"
-}
-
 builtin_cat()
 {
 	local s eof=
@@ -341,7 +335,8 @@ cmd_new()
 	local newname='' newver='' branchname='' name='' ver=''
 
 	if [ "$#" != 0 ]; then
-		branch_exists "$1"
+		git rev-parse "$1" >/dev/null 2>&1 ||
+			fatal "unknown branch: $1"
 		branchname="$1"
 		shift
 	fi
@@ -359,7 +354,7 @@ cmd_new()
 		current_patchset branchname name ver
 
 	if [ -z "$newver" ]; then
-		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$bname/" |
+		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$name/" |
 			sed -e 's/^.*\/[av]//' |
 			sort -n |
 			tail -1)"
@@ -368,7 +363,7 @@ cmd_new()
 
 	newname="patchset/$name/v$newver"
 
-	! branch_exists "$newname" ||
+	! git rev-parse "$newname" >/dev/null 2>&1 ||
 		fatal "$newname: branch already exists"
 
 	git branch -c "$branchname" "$newname" ||
@@ -461,7 +456,8 @@ cmd_info()
 	done
 
 	if [ "$#" != 0 ]; then
-		branch_exists "$1"
+		git rev-parse "$1" >/dev/null 2>&1 ||
+			fatal "unknown branch: $1"
 		branchname="$1"
 		shift
 	fi
