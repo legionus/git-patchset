@@ -356,7 +356,7 @@ cmd_new()
 	if [ -z "$newver" ]; then
 		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$name/" |
 			sed -e 's/^.*\/[av]//' |
-			sort -n |
+			sort --version-sort |
 			tail -1)"
 		newver="${newver:-1}"
 
