@@ -358,7 +358,13 @@ cmd_new()
 			sed -e 's/^.*\/[av]//' |
 			sort -n |
 			tail -1)"
-		newver=$(($newver + 1))
+		newver="${newver:-1}"
+
+		if [ -z "${newver##*.[0-9]*}" ]; then
+			newver="${newver%.*}.$((${newver##*.} + 1))"
+		else
+			newver=$(($newver + 1))
+		fi
 	fi
 
 	newname="patchset/$name/v$newver"
