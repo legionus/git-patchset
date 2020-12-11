@@ -190,7 +190,7 @@ cmd_list()
 			return ;;
 	esac
 
-	local mode='' ver=v
+	local mode='' ver=v show_current=''
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -200,6 +200,9 @@ cmd_list()
 			--archive)
 				mode="${mode:-latest}"
 				ver=a
+				;;
+			--current)
+				show_current=1
 				;;
 			*)
 				break
@@ -222,23 +225,34 @@ cmd_list()
 		ColorReset="$(  git config --get-color "" "reset")"
 	fi
 
+	local curbranch='' curname=''
+	current_patchset curbranch curname
+
+	[ "$mode" = 'versions' ] ||
+		curname='*'
+
 	{
-		name='*'
-		[ "$mode" != 'versions' ] ||
-			current_patchset _ name
 		git for-each-ref \
 			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
 			--sort=refname \
-			"refs/heads/patchset/$name/$ver[0-9]*"
+			"refs/heads/patchset/$curname/$ver[0-9]*"
 		printf '\n'
 	} |
 	while read -r on_mark on_objectname on_branchname; do
 		on_patchset="${on_branchname%/$ver*}"
 
 		while [ -n "${branchname-}" ]; do
-			[ "$mode" = 'all' ] || [ "$mode" = 'versions' ] ||
-				[ "${prev_patchset:-$on_patchset}" != "$on_patchset" ] ||
-				break
+			case "$mode" in
+				all|versions)
+					;;
+				latest)
+					if [ -n "$show_current" ] && [ "$branchname" = "$curbranch" ]; then
+						:;
+					elif [ "${prev_patchset:-$on_patchset}" = "$on_patchset" ]; then
+						break
+					fi
+					;;
+			esac
 
 			basecommit="$(basecommit_for "$branchname")"
 
@@ -793,7 +807,7 @@ cmd_log()
 	git log "$@" "$basecommit..$branchname"
 }
 
-[ "$#" != 0 ] || set -- list --latest
+[ "$#" != 0 ] || set -- list --latest --current
 cmd="$1"; shift
 
 __PATCHSET_HELP=
