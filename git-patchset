@@ -643,6 +643,11 @@ cmd_export()
 
 	basecommit="$(basecommit_for "$branchname")"
 
+	if [ -z "${ver##*[!0-9]*}" ]; then
+		# git-format-patch: switch `v' expects a numerical value
+		ver="${ver%%[!0-9]*}"
+	fi
+
 	git format-patch -v "$ver" --thread --minimal --cover-from-description=auto \
 		"$@" "$basecommit..$branchname"
 }
