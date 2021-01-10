@@ -82,7 +82,7 @@ cmd_help()
 	local n cmd= found=
 	[ "$#" = 0 ] || cmd="$1"
 
-	set -- create new list info log export send archive help
+	set -- create config new list info log export send archive help
 
 	if [ -n "$cmd" ]; then
 		for n in "$@"; do
@@ -90,8 +90,13 @@ cmd_help()
 		done
 		[ -n "$found" ] ||
 			fatal "unknown command: $cmd"
+		local prefix='Usage:'
+		__PATCHSET_HELP=usage "cmd_$cmd" |
+		while IFS='' read -r options; do
+			printf '%s git %s %s %s\n' "$prefix" "$PROGCMD" "$cmd" "$options"
+			prefix='   or:'
+		done
 		builtin_cat <<-EOF
-		Usage: git $PROGCMD $cmd `__PATCHSET_HELP=usage "cmd_$cmd"`
 
 		`
 		__PATCHSET_HELP=descr   "cmd_$cmd"
@@ -107,8 +112,10 @@ cmd_help()
 	builtin_cat <<-EOF
 	Usage: git $PROGCMD [<command>] [<args>]
 	`for n in "$@"; do
-		printf '   or: git %s %s ' "$PROGCMD" "$n"
-		__PATCHSET_HELP=usage "cmd_$n"
+		__PATCHSET_HELP=usage "cmd_$n" |
+		while IFS='' read -r options; do
+			printf '   or: git %s %s %s\n' "$PROGCMD" "$n" "$options"
+		done
 	done`
 
 	This is highlevel utility for easy patchset creation. Each patchset has
@@ -419,28 +426,57 @@ describe_patchset()
 		"$basecommit..$branchname"
 }
 
-cmd_info()
+fetch_config_section()
+{
+	local branchname="$1"
+	local infile="$2"
+	local outfile="$3"
+
+	{
+		[ -n "${branchname##*[\[\].*&^\$\\\\/]*}" ] ||
+			branchname="$(printf %s "$branchname" | sed -e 's/[].*&^$[\/]/\\&/g')"
+
+		export GIT_CONFIG="$infile"
+
+		for n in "patchset" "branch\\.$branchname"; do
+			git config --name-only --get-regexp "^$n\\.to" | sort -u
+			git config --name-only --get-regexp "^$n\\.cc" | sort -u
+			git config --name-only --get-regexp "^$n\\." |
+				grep -v -e '\.\(to\|cc\|description\)$' |
+				sort -u
+		done
+	} |
+	while read -r name; do
+		git config -f "$outfile" --unset-all "$name" ||:
+		git config -f "$infile" --get-all "$name" | sort -u |
+		while read -r value; do
+			git config -f "$outfile" --add "$name" "$value"
+		done
+	done
+}
+
+cmd_config()
 {
 	case "$__PATCHSET_HELP" in
-		usage) printf '[-e|--edit] [--no-pager] [--global] [--to=<email>] [--cc=<email>] [<patchset>]\n'
+		usage)
+			printf '[-e|--edit] [<patchset>]\n'
+			printf '[--global] [--to=<email>] [--cc=<email>] [<patchset>]\n'
 			return ;;
 		descr) printf '%s\n' \
-			"Shows or changes the description of the patchset. This description" \
-			"will be used for cover-letter. You can always change or delete To" \
+			"Changes options of the patchset. You can always change or delete To" \
 			"and Cc fields using the \`git config -e'."
 			return ;;
 		options) printf '%s\n' \
 			"" \
 			"Options:" \
-			"  -e,--edit      open editor to change the description." \
-			"  --to=<email>   add a To: header to the email headers." \
-			"  --cc=<email>   add a Cc: header to the email headers." \
-			"  --global       add <email> globally for all patchsets." \
-			"  --no-pager     do not pipe git output into a pager."
+			"  -e, --edit      open editor to change options." \
+			"  --to=<email>    add a To: header to the email headers." \
+			"  --cc=<email>    add a Cc: header to the email headers." \
+			"  --global        add <email> globally for all patchsets." \
 			return ;;
 	esac
 
-	local branchname='' name='' ver='' mode=list use_pager=1 pager=''
+	local branchname='' name='' ver='' mode=edit
 	local to cc cfg_prefix=''
 
 	to=(); cc=();
@@ -449,9 +485,6 @@ cmd_info()
 		case "$1" in
 			-e|--edit)
 				mode=edit
-				;;
-			--no-pager)
-				use_pager=
 				;;
 			--global)
 				cfg_prefix="patchset"
@@ -495,8 +528,6 @@ cmd_info()
 	if [ -n "$cfg_prefix" ]; then
 		[ "$mode" != 'edit' ] ||
 			fatal "options --edit and --global are mutually exclusive"
-		[ "$mode" != 'list' ] ||
-			fatal "option --global is useless for viewing the description"
 	fi
 
 	if [ "${#to[@]}" != 0 ] || [ "${#cc[@]}" != 0 ]; then
@@ -538,6 +569,98 @@ cmd_info()
 
 	case "$mode" in
 		edit)
+			local git_dir rc=0
+
+			git_dir="$(git rev-parse --absolute-git-dir)"
+
+			:> "$git_dir/config.patchset.ini"
+
+			(
+				fetch_config_section "$branchname" \
+					"$git_dir/config" \
+					"$git_dir/config.patchset.ini"
+
+				git config \
+					--file "$git_dir/config.patchset.ini" \
+					--edit
+
+				fetch_config_section "$branchname" \
+					"$git_dir/config.patchset.ini" \
+					"$git_dir/config"
+			) || rc=$?
+
+			rm -f -- "$git_dir/config.patchset.ini"
+
+			[ "$rc" = 0 ] ||
+				return $rc
+			;;
+		tocc)
+			[ "${#to[@]}" = 0 ] || message "added $to_nr new addresses to \`To' list"
+			[ "${#cc[@]}" = 0 ] || message "added $cc_nr new addresses to \`Cc' list"
+			;;
+	esac
+
+}
+
+cmd_info()
+{
+	case "$__PATCHSET_HELP" in
+		usage) printf '[-e|--edit] [--no-pager] [<patchset>]\n'
+			return ;;
+		descr) printf '%s\n' \
+			"Shows or changes the description of the patchset. This description" \
+			"will be used for cover-letter."
+			return ;;
+		options) printf '%s\n' \
+			"" \
+			"Options:" \
+			"  -e, --edit      open editor to change the description." \
+			"  --no-pager      do not pipe git output into a pager."
+			return ;;
+	esac
+
+	local branchname='' name='' ver='' mode=list use_pager=1 pager=''
+
+	to=(); cc=();
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			-e|--edit)
+				mode=edit
+				;;
+			--no-pager)
+				use_pager=
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
+
+	if [ "$#" != 0 ]; then
+		git rev-parse "$1" >/dev/null 2>&1 ||
+			fatal "unknown branch: $1"
+		branchname="$1"
+		shift
+	fi
+
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
+
+	[ -n "$branchname" ] &&
+		parse_patchset "$branchname" branchname name ver ||
+		current_patchset branchname name ver
+
+	[ -n "$name" ] && [ -n "$ver" ] ||
+		fatal "unable to parse patchset"
+
+	case "$mode" in
+		edit)
 			git branch --edit-description "$branchname"
 			;;
 		list)
@@ -547,10 +670,6 @@ cmd_info()
 			else
 				describe_patchset "$branchname"
 			fi
-			;;
-		tocc)
-			[ "${#to[@]}" = 0 ] || message "added $to_nr new addresses to \`To' list"
-			[ "${#cc[@]}" = 0 ] || message "added $cc_nr new addresses to \`Cc' list"
 			;;
 	esac
 }
@@ -824,6 +943,7 @@ case "$cmd" in
 	ls|list)   cmd_list "$@"      ;;
 	info|cover|cover-letter)
 	           cmd_info "$@"      ;;
+	config)    cmd_config "$@"    ;;
 	new)       cmd_new "$@"       ;;
 	log)       cmd_log "$@"       ;;
 	send)      cmd_send "$@"      ;;
