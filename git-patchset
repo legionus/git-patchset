@@ -931,24 +931,24 @@ cmd_log()
 	git log "$@" "$basecommit..$branchname"
 }
 
+cmd_unknown()
+{
+	fatal "unknown command: $cmd"
+}
+
 [ "$#" != 0 ] || set -- list --latest --current
 cmd="$1"; shift
 
 __PATCHSET_HELP=
+n=unknown
 
 case "$cmd" in
-	-h|help)   cmd_help "$@"      ;;
-	cr|create) cmd_create "$@"    ;;
-	ex|export) cmd_export "$@"    ;;
-	ls|list)   cmd_list "$@"      ;;
-	info|cover|cover-letter)
-	           cmd_info "$@"      ;;
-	config)    cmd_config "$@"    ;;
-	new)       cmd_new "$@"       ;;
-	log)       cmd_log "$@"       ;;
-	send)      cmd_send "$@"      ;;
-	archive)   cmd_archive "$@"   ;;
-	*)
-		fatal "unknown command: $cmd"
-		;;
+	-h|help)                     n="help"   ;;
+	cr|create)                   n="create" ;;
+	ex|export)                   n="export" ;;
+	ls|list)                     n="list"   ;;
+	info|cover|cover-letter)     n="info"   ;;
+	config|new|log|send|archive) n="$cmd"   ;;
 esac
+
+"cmd_$n" "$@"
