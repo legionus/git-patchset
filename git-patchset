@@ -82,7 +82,7 @@ cmd_help()
 	local n cmd= found=
 	[ "$#" = 0 ] || cmd="$1"
 
-	set -- create config new list info log export send archive help
+	set -- create config new list cover log export send archive help
 
 	if [ -n "$cmd" ]; then
 		for n in "$@"; do
@@ -605,7 +605,7 @@ cmd_config()
 
 }
 
-cmd_info()
+cmd_cover()
 {
 	case "$__PATCHSET_HELP" in
 		usage) printf '[-e|--edit] [--no-pager] [<patchset>]\n'
@@ -946,12 +946,21 @@ __PATCHSET_HELP=
 n=unknown
 
 case "$cmd" in
-	-h|help)                     n="help"   ;;
-	cr|create)                   n="create" ;;
-	ex|export)                   n="export" ;;
-	ls|list)                     n="list"   ;;
-	info|cover|cover-letter)     n="info"   ;;
-	config|new|log|send|archive) n="$cmd"   ;;
+	-h|help)
+		n="help"
+		;;
+	cr|create)
+		n="create"
+		;;
+	ex|export)
+		n="export"
+		;;
+	ls|list)
+		n="list"
+		;;
+	config|cover|new|log|send|archive)
+		n="$cmd"
+		;;
 esac
 
 "cmd_$n" "$@"
