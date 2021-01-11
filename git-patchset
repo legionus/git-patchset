@@ -458,9 +458,9 @@ fetch_config_section()
 cmd_config()
 {
 	case "$__PATCHSET_HELP" in
-		usage)
-			printf '[-e|--edit] [<patchset>]\n'
-			printf '[--global] [--to=<email>] [--cc=<email>] [<patchset>]\n'
+		usage) printf '%s\n' \
+			'[-e|--edit] [<patchset>]' \
+			'[--global] [--to=<email>] [--cc=<email>] [<patchset>]'
 			return ;;
 		descr) printf '%s\n' \
 			"Changes options of the patchset. You can always change or delete To" \
@@ -472,7 +472,7 @@ cmd_config()
 			"  -e, --edit      open editor to change options." \
 			"  --to=<email>    add a To: header to the email headers." \
 			"  --cc=<email>    add a Cc: header to the email headers." \
-			"  --global        add <email> globally for all patchsets." \
+			"  --global        add <email> globally for all patchsets."
 			return ;;
 	esac
 
