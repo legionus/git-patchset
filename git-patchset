@@ -343,17 +343,40 @@ cmd_create()
 cmd_new()
 {
 	case "$__PATCHSET_HELP" in
-		usage) printf '[<patchset>] [number]\n'
+		usage) printf '[--major|--minor] [<patchset>] [number]\n'
 			return ;;
 		descr) printf '%s\n' \
 			"Creates branch for a new version of <patchset>. Branch will" \
 			"copy the description and recipient list."
 			return ;;
-		options)
+		options) printf '%s\n' \
+			"" \
+			"Options:" \
+			"  --major   increment major version number." \
+			"  --minor   increment minor version number."
 			return ;;
 	esac
 
-	local newname='' newver='' branchname='' name='' ver=''
+	local newname='' newver='' branchname='' name='' ver='' inc=''
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			--minor)
+				inc=minor
+				;;
+			--major)
+				inc=major
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
 
 	if [ "$#" != 0 ]; then
 		git rev-parse "$1" >/dev/null 2>&1 ||
@@ -382,9 +405,15 @@ cmd_new()
 		newver="${newver:-1}"
 
 		if [ -z "${newver##*.[0-9]*}" ]; then
-			newver="${newver%.*}.$((${newver##*.} + 1))"
+			case "${inc:-minor}" in
+				major) newver="$((${newver%%.*} + 1)).0" ;;
+				minor) newver="${newver%.*}.$((${newver##*.} + 1))" ;;
+			esac
 		else
-			newver=$(($newver + 1))
+			case "${inc:-major}" in
+				major) newver="$(($newver + 1))" ;;
+				minor) newver="$(($newver + 1)).0" ;;
+			esac
 		fi
 	fi
 
@@ -573,7 +602,7 @@ cmd_config()
 
 			git_dir="$(git rev-parse --absolute-git-dir)"
 
-			cat > "$git_dir/config.patchset.ini" <<-EOF
+			builtin_cat > "$git_dir/config.patchset.ini" <<-EOF
 			[patchset]
 
 			[branch "$branchname"]
