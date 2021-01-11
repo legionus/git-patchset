@@ -573,8 +573,11 @@ cmd_config()
 
 			git_dir="$(git rev-parse --absolute-git-dir)"
 
-			:> "$git_dir/config.patchset.ini"
+			cat > "$git_dir/config.patchset.ini" <<-EOF
+			[patchset]
 
+			[branch "$branchname"]
+			EOF
 			(
 				fetch_config_section "$branchname" \
 					"$git_dir/config" \
