@@ -19,6 +19,17 @@ fatal()
 	exit 1
 }
 
+quote_regexp()
+{
+	local out="$*"
+	if [ -z "${out##*[\[\].*&^\$\\\\/]*}" ]; then
+		out="$(printf %s "$out" |
+				sed -e 's/[].*&^$[\/]/\\&/g')" ||
+			return 1
+	fi
+	printf '%s' "$out"
+}
+
 parse_patchset()
 {
 	local __v='' __n="$1"
@@ -460,30 +471,40 @@ describe_patchset()
 
 fetch_config_section()
 {
-	local branchname="$1"
-	local infile="$2"
-	local outfile="$3"
+	local branchname infile outfile inkeys outkeys inname outname
 
+	branchname="$1"; shift
+	infile="$1"; shift
+	outfile="$1"; shift
+
+	list_config_keys()
 	{
-		[ -n "${branchname##*[\[\].*&^\$\\\\/]*}" ] ||
-			branchname="$(printf %s "$branchname" | sed -e 's/[].*&^$[\/]/\\&/g')"
+		eval "$1=()"
+		readarray -t "$1" <<< $(
+			for n in "patchset." "branch.$branchname."; do
+				printf '%s\n' "${n}to" "${n}cc"
+				git config -f "$2" --name-only --get-regexp "^$(quote_regexp "$n")" |
+					grep -v -e '\.\(to\|cc\|description\)$' |
+					sort -u
+			done)
+	}
 
-		export GIT_CONFIG="$infile"
+	list_config_keys inkeys "$infile"
+	list_config_keys outkeys "$outfile"
 
-		for n in "patchset" "branch\\.$branchname"; do
-			git config --name-only --get-regexp "^$n\\.to" | sort -u
-			git config --name-only --get-regexp "^$n\\.cc" | sort -u
-			git config --name-only --get-regexp "^$n\\." |
-				grep -v -e '\.\(to\|cc\|description\)$' |
-				sort -u
-		done
-	} |
-	while read -r name; do
-		git config -f "$outfile" --unset-all "$name" ||:
-		git config -f "$infile" --get-all "$name" | sort -u |
+	for inname in "${inkeys[@]}"; do
+		git config -f "$outfile" --unset-all "$inname" ||:
+		git config -f "$infile" --get-all "$inname" 2>/dev/null | sort -u |
 		while read -r value; do
-			git config -f "$outfile" --add "$name" "$value"
+			git config -f "$outfile" --add "$inname" "$value"
 		done
+	done
+
+	for outname in "${outkeys[@]}"; do
+		for inname in "${inkeys[@]}"; do
+			[ "$inname" != "$outname" ] || continue 2
+		done
+		git config -f "$outfile" --unset-all "$outname"
 	done
 }
 
