@@ -605,11 +605,24 @@ cmd_config()
 
 			git_dir="$(git rev-parse --absolute-git-dir)"
 
-			builtin_cat > "$git_dir/config.patchset.ini" <<-EOF
-			[patchset]
+			builtin_cat > "$git_dir/config.patchset.ini" <<EOF
+[patchset]
 
-			[branch "$branchname"]
-			EOF
+[branch "$branchname"]
+#
+# Available fields:
+#
+# - patchset.to, branch.*.to, patchset.cc, branch.*.cc
+#
+# Fields define the recipients for this patchset. One recipient per line. The
+# field can be specified multiple times.  If you specify fields in the patchset
+# section, they will be substituted for any other patchsets.
+#
+# - branch.*.subject-prefix
+#
+# Add value to the subject of each patch.
+#
+EOF
 			(
 				fetch_config_section "$branchname" \
 					"$git_dir/config" \
