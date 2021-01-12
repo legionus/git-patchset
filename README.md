@@ -1,52 +1,84 @@
 # git-patchset
 
-This is highlevel utility for easy patchset creation. Each patchset has a version
-and description.
+This is highlevel utility for easy creating and maintaining a patchset. Patchset
+is a set of patches that implement a feature or fix something.
 
+Quite a common story when upstream asks for changes to a proposed patch (make a
+new version). Sometimes there can be a dozen of such versions. When the prepared
+changes in the one patch, then there are no special problems with preparing a
+new version of this patch. When a patchset consists of 5, 8, or more patches,
+updating it becomes a difficult rebase task.
+
+This utility is designed to simplify the process of creating, updating and
+publishing large patchsets. The utility relies heavily on techniques already in
+git.
+
+## Patchset
+
+In git terms, patchset name is just a part of branch name. Each patchset has a
+version and description. Each version of a patchset is represented by a git
+branch.
+
+To start a new patchset, you need to select a base branch:
+```console
+$ git branch --list 'linux-*'
+  linux-5.10-rc6
+  linux-5.10-rc7
+  linux-5.6
+  linux-5.7
+  linux-5.8
+  linux-5.9
+
+$ git patchset create foo linux-5.10-rc7
+Updating files: 100% (11538/11538), done.
+Branch 'patchset/foo/v1' set up to track local branch 'linux-5.10-rc7'.
+Switched to a new branch 'patchset/foo/v1'
+git-patchset: new patchset created: patchset/foo/v1
+
+$ git patchset list
+* 0477e9288185..0477e9288185     (0) patchset/foo/v1
 ```
-Usage: git patchset [<command>] [<args>]
-   or: git patchset create <newname> [<start-point>]
-   or: git patchset new [<patchset>] [number]
-   or: git patchset list [--all|--latest] [--archive]
-   or: git patchset info [-e|--edit] [--no-pager] [--global] [--to=<email>] [--cc=<email>] [<patchset>]
-   or: git patchset export [--resend] [--rfc] [<patchset>] [<options>]
-   or: git patchset send [[<options>] <files|directory>]
-   or: git patchset archive [--add|--restore] [<patchset>]
-   or: git patchset help [<command>]
 
-This is highlevel utility for easy patchset creation. Each patchset has
-a version and description.
+The new patchset starts at v1. When you create a new patchset, you will be asked
+to describe the proposed changes.
 
-Commands:
+To change the patchset description:
+```console
+$ git patchset cover -e
+```
 
-create    Creates branch for a new patchset. The new branch will be
-          created with v1 version. The new branch head will point to
-          <start-point> commit or to current commit.
+By default, the patchset list contains only the latest versions.
+```console
+$ git patchset
+* 0477e9288185..0477e9288185    (11) patchset/foo/v1
+- 0477e9288185..1e796f9e008f     (6) patchset/fuse-inprocess-request/v3
+- e71ba9452f0b..5da51b21077b     (8) patchset/per-userspace-rlimit/v3
+- 629727c85a17..2ef0e59e5c51     (5) patchset/proc-revealing/v4
 
-new       Creates branch for a new version of <patchset>. Branch will
-          copy the description and recipient list.
+$ git patchset list --versions
+- bcf876870b95..d755e9e48cea    (11) patchset/foo/v1
+- bcf876870b95..f2fb7c729413    (11) patchset/foo/v2
+- 0477e9288185..cf5d6cd40d2e    (15) patchset/foo/v3
+- e71ba9452f0b..54b0cf752c2c    (15) patchset/foo/v4
+- e71ba9452f0b..5da51b21077b    (18) patchset/foo/v5
+```
 
-list      Shows a list of known patchsets. The current patchset will
-          be marked with an asterisk. The list also shows the base and
-          last commits as well as the number of commits.
+To prepare a patchset for publication use the command:
+```console
+$ git patchset export -o patches/
+```
 
-info      Shows or changes the description of the patchset. This description
-          will be used for cover-letter. You can always change or delete To
-          and Cc fields using the `git config -e'.
+You can use any method for submitting patches. If you use git-send-email, you
+can do it right away:
 
-export    Prepares patches for e-mail submission. The <options> will be passed
-          to git-format-patch(1).
+```console
+$ git patchset send
+```
 
-send      Sends patches by e-mail. The <options> will be passed
-          to git-send-email(1). Without any options, the command
-          will export current patchset itself.
+## License
 
-archive   Archive or unarchive the patchset. The specified version will be
-          ignored. The archived patchset is not listed by default.
+SPDX-License-Identifier: GPL-2.0
 
-help      Shows this message and exit.
+## Bugs
 
 Report bugs to authors.
-
-```
-
