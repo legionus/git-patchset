@@ -147,26 +147,6 @@ get_pager()
 	eval "$1=\"\$__get_pager\""
 }
 
-show_field_list()
-{
-	local arr i n="$1"
-
-	readarray -t arr <<< $(
-		git config --get-all patchset.$2 ||:;
-		git config --get-all branch.$branchname.$2 ||:;
-	)
-
-	for i in "${!arr[@]}"; do
-		if [ -n "${arr[$i]}" ]; then
-			printf "%-${#1}s %s" "$n" "${arr[$i]}"
-			[ "$i" = "$(( ${#arr[@]} - 1 ))" ] ||
-				printf ','
-			printf '\n'
-			n=
-		fi
-	done
-}
-
 basecommit_for()
 {
 	local merge
@@ -433,13 +413,36 @@ cmd_new()
 
 describe_patchset()
 {
-	local branchname basecommit subject_prefix
+	local branchname basecommit subject_prefix ver
 
 	branchname="$1"; shift
 	basecommit="$(basecommit_for "$branchname")"
 
 	subject_prefix="$(git config --get branch.$branchname.subject-prefix)" ||:
 	subject_prefix="${subject_prefix:+$subject_prefix }PATCH"
+
+	ver="${branchname##*/[av]}"
+	ver="${ver%%.*}"
+
+	show_field_list()
+	{
+		local arr i n="$1"
+
+		readarray -t arr <<< $(
+			git config --get-all patchset.$2 ||:;
+			git config --get-all branch.$branchname.$2 ||:;
+		)
+
+		for i in "${!arr[@]}"; do
+			[ -n "${arr[$i]}" ] ||
+				continue
+			printf "%-${#1}s %s" "$n" "${arr[$i]}"
+			[ "$i" = "$(( ${#arr[@]} - 1 ))" ] ||
+				printf ','
+			printf '\n'
+			n=
+		done
+	}
 
 	printf 'From %s %s\n' \
 		"$(git config --get user.email)" \
@@ -448,7 +451,7 @@ describe_patchset()
 	show_field_list Cc: cc
 	printf 'Subject: [%s v%s 0/%s] %s\n\n' \
 		"$subject_prefix" \
-		"${branchname##*/[av]}" \
+		"$ver" \
 		"$(git rev-list --count "$basecommit..$branchname")" \
 		"$(git config "branch.$branchname.description")"
 	git rev-list --date-order --reverse --abbrev-commit --format=oneline \
