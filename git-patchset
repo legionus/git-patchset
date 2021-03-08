@@ -211,9 +211,6 @@ cmd_list()
 
 	mode="${mode:-all}"
 
-	[ "$#" = 0 ] ||
-		fatal "too many arguments"
-
 	local ColorRange='' ColorReset='' ColorCurrent='' ColorDefault=''
 
 	if [ "$color" = always ]; then
@@ -224,7 +221,26 @@ cmd_list()
 	fi
 
 	local curbranch='' curname=''
-	current_patchset curbranch curname
+
+	case "$mode" in
+		versions)
+			if [ "$#" != 0 ]; then
+				git rev-parse "$1" >/dev/null 2>&1 ||
+					fatal "unknown branch: $1"
+				name="$1"
+				shift
+			fi
+
+			[ -n "${name-}" ] &&
+				parse_patchset "$name" curbranch curname ||
+				current_patchset curbranch curname
+			;;
+		*)
+			;;
+	esac
+
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
 
 	[ "$mode" = 'versions' ] ||
 		curname='*'
