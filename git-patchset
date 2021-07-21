@@ -248,8 +248,8 @@ cmd_list()
 	{
 		git for-each-ref \
 			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
-			--sort=refname \
-			"refs/heads/patchset/$curname/$ver[0-9]*"
+			"refs/heads/patchset/$curname/$ver[0-9]*" |
+			sort -V -t\  -k3,3
 		printf '\n'
 	} |
 	while read -r on_mark on_objectname on_branchname; do
@@ -327,24 +327,24 @@ cmd_create()
 		fatal "empty branch name is not allowed"
 
 	git switch \
-		--create "patchset/$branchname/v1" \
+		--create "patchset/$branchname/v1.0" \
 		--track ${startpoint:+"$startpoint"} ||
-		fatal "unable to create new branch: patchset/$branchname/v1"
+		fatal "unable to create new branch: patchset/$branchname/v1.0"
 
 	git config \
-		"branch.patchset/$branchname/v1.description" \
+		"branch.patchset/$branchname/v1.0.description" \
 		"*** SUBJECT HERE ***
 
 *** PATCHSET DESCRIPTION HERE ***
 
 --
 " ||
-		fatal "unable to write empty description for patchset/$branchname/v1"
+		fatal "unable to write empty description for patchset/$branchname/v1.0"
 
-	git branch --edit-description "patchset/$branchname/v1" ||
+	git branch --edit-description "patchset/$branchname/v1.0" ||
 		fatal "unable to change description"
 
-	message "new patchset created: patchset/$branchname/v1"
+	message "new patchset created: patchset/$branchname/v1.0"
 }
 
 cmd_new()
