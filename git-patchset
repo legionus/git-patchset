@@ -160,12 +160,28 @@ get_pager()
 
 basecommit_for()
 {
-	local merge
+	local merge remote
 	if ! merge="$(git config "branch.$1.merge")"; then
 		message "Use \`git branch -u <upstream> $1\` to set upstream for branch."
 		fatal "not found upstream for branch: $1"
 	fi
-	git rev-parse --short "$merge"
+
+	if ! remote="$(git config "branch.$1.remote")"; then
+		fatal "unable to find \"branch.$1.remote\"."
+	fi
+
+	case "$remote" in
+		'.')
+			;;
+		*)
+			merge="${merge#refs/}"
+			merge="${merge#heads/}"
+			merge="refs/remotes/$remote/$merge"
+			;;
+	esac
+
+	git rev-parse --short "$merge" ||
+		fatal "unable to resolve reference: $merge"
 }
 
 cmd_list()
