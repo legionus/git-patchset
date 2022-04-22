@@ -778,7 +778,7 @@ cmd_cover()
 cmd_export()
 {
 	case "$__PATCHSET_HELP" in
-		usage) printf '[--resend] [--rfc] [<patchset>] [<options>]\n'
+		usage) printf '[--resend] [--rfc] [(-o|--output-directory) DIR] [<patchset>] [<options>]\n'
 			return ;;
 		descr) printf '%s\n' \
 			"Prepares patches for e-mail submission. The <options> will be passed" \
@@ -787,13 +787,15 @@ cmd_export()
 		options) printf '%s\n' \
 			"" \
 			"Options:" \
-			"  --resend  shortcut to add RESEND tag to the subject." \
-			"  --rfc     shortcut to add RFC tag to the subject."
+			"  -o, --output-directory DIR    use <DIR> to store the resulting files" \
+			"                                (default: patches/PATCHSET/)" \
+			"  --resend                      shortcut to add RESEND tag to the subject." \
+			"  --rfc                         shortcut to add RFC tag to the subject."
 			return ;;
 	esac
 
 	local subject_prefix='' branchname='' basecommit name ver arr
-	local resend='' rfc=''
+	local resend='' rfc='' outdir=''
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -802,6 +804,17 @@ cmd_export()
 				;;
 			--rfc)
 				rfc=RFC
+				;;
+			-o|--output-directory|--output-directory=*)
+				case "$1" in
+					-o|--output-directory)
+						shift
+						outdir="$1"
+						;;
+					--output-directory=*)
+						outdir="${1#--output-directory=}"
+						;;
+				esac
 				;;
 			--)
 				shift
@@ -868,7 +881,13 @@ cmd_export()
 		ver="${ver%%[!0-9]*}"
 	fi
 
+	outdir="${outdir:-patches/$name/}"
+
+	[ -d "$outdir" ] ||
+		mkdir -p -- "$outdir"
+
 	git format-patch -v "$ver" --thread --minimal --cover-from-description=auto \
+		-o "$outdir" \
 		"$@" "$basecommit..$branchname"
 }
 
