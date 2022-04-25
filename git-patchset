@@ -309,26 +309,53 @@ cmd_list()
 cmd_create()
 {
 	case "$__PATCHSET_HELP" in
-		usage) printf '<newname> [<start-point>]\n'
+		usage) printf '<newname> [options]\n'
 			return ;;
 		descr) printf '%s\n' \
 			"Creates branch for a new patchset. The new branch will be" \
 			"created with v1 version. The new branch head will point to" \
 			"<start-point> commit or to current commit."
 			return ;;
-		options)
+		options) printf '%s\n' \
+			"" \
+			"Options:" \
+			"  -s, --start-point=COMMIT   specifying a COMMIT allows you to create a branch" \
+			"                             based on some other point in history than where" \
+			"                             HEAD currently points."
 			return ;;
 	esac
 
+	local args branchname='' startpoint=''
+
+	args=()
+	while [ "$#" -gt 0 ]; do
+		case "$1" in
+			-s|--start-point)
+				[ "$#" -gt 1 ] ||
+					fatal "argument required for $1 option"
+				startpoint="$2"
+				shift
+				;;
+			--start-point=*)
+				startpoint="${1#--start-point=}"
+				;;
+			*)
+				args+=("$1")
+				;;
+		esac
+		shift
+	done
+	set -- "${args[@]}"
+
 	[ "$#" != 0 ] ||
 		fatal "patchset name required"
-
-	local branchname='' startpoint=''
 
 	branchname="$1"
 	shift
 
 	if [ "$#" != 0 ]; then
+		[ -z "$startpoint" ] ||
+			fatal "start-point already specified via options"
 		startpoint="$1"
 		shift
 	fi
