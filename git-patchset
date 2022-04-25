@@ -188,12 +188,14 @@ basecommit_for()
 {
 	local merge remote
 	if ! merge="$(git config "branch.$1.merge")"; then
+		message "not found upstream for branch: $1"
 		message "Use \`git branch -u <upstream> $1\` to set upstream for branch."
-		fatal "not found upstream for branch: $1"
+		return 1
 	fi
 
 	if ! remote="$(git config "branch.$1.remote")"; then
-		fatal "unable to find \"branch.$1.remote\"."
+		message "unable to find \"branch.$1.remote\"."
+		return 1
 	fi
 
 	case "$remote" in
@@ -206,8 +208,10 @@ basecommit_for()
 			;;
 	esac
 
-	git rev-parse --short "$merge" ||
-		fatal "unable to resolve reference: $merge"
+	git rev-parse --short "$merge" || {
+		message "unable to resolve reference: $merge"
+		return 1
+	}
 }
 
 cmd_list()
@@ -310,7 +314,8 @@ cmd_list()
 					;;
 			esac
 
-			basecommit="$(basecommit_for "$branchname")"
+			basecommit="$(basecommit_for "$branchname")" ||
+				break
 
 			[ "$mark" = '*' ] &&
 				current="$ColorCurrent" ||
@@ -559,7 +564,8 @@ describe_patchset()
 	local branchname basecommit subject_prefix ver
 
 	branchname="$1"; shift
-	basecommit="$(basecommit_for "$branchname")"
+	basecommit="$(basecommit_for "$branchname")" ||
+		return 1
 
 	subject_prefix="$(git config --get branch.$branchname.subject-prefix)" ||:
 	subject_prefix="${subject_prefix:+$subject_prefix }PATCH"
@@ -974,7 +980,8 @@ cmd_export()
 
 	set -- "$@" "--subject-prefix=$subject_prefix"
 
-	basecommit="$(basecommit_for "$branchname")"
+	basecommit="$(basecommit_for "$branchname")" ||
+		return 1
 
 	if [ -z "${ver##*[!0-9]*}" ]; then
 		# git-format-patch: switch `v' expects a numerical value
@@ -1146,7 +1153,8 @@ cmd_log()
 		parse_patchset "$branchname" branchname ||
 		current_patchset branchname
 
-	basecommit="$(basecommit_for "$branchname")"
+	basecommit="$(basecommit_for "$branchname")" ||
+		return 1
 
 	git log "$@" "$basecommit..$branchname"
 }
