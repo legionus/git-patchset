@@ -44,6 +44,18 @@ chdir_to_toplevel()
 	fi
 }
 
+workdir=
+cleanup_handler()
+{
+	trap - EXIT
+	[ -z "$workdir" ] ||
+		rm -rf -- "$workdir" ||:
+	exit "$1"
+}
+
+exit_handler()   { cleanup_handler $?; }
+signal_handler() { cleanup_handler  1; }
+
 parse_patchset()
 {
 	local __v='' __n="$1"
@@ -335,11 +347,12 @@ cmd_create()
 			"Options:" \
 			"  -s, --start-point=COMMIT   specifying a COMMIT allows you to create a branch" \
 			"                             based on some other point in history than where" \
-			"                             HEAD currently points."
+			"                             HEAD currently points." \
+			"  -m, --use-local-mbox=FILE  process FILE mbox to import patchset."
 			return ;;
 	esac
 
-	local args branchname='' startpoint=''
+	local args branchname='' startpoint='' mbox=''
 
 	args=()
 	while [ "$#" -gt 0 ]; do
@@ -352,6 +365,15 @@ cmd_create()
 				;;
 			--start-point=*)
 				startpoint="${1#--start-point=}"
+				;;
+			-m|--use-local-mbox)
+				[ "$#" -gt 1 ] ||
+					fatal "argument required for $1 option"
+				mbox="$2"
+				shift
+				;;
+			--use-local-mbox=*)
+				mbox="${1#--use-local-mbox=}"
 				;;
 			*)
 				args+=("$1")
@@ -383,25 +405,62 @@ cmd_create()
 	[ -n "$branchname" ] ||
 		fatal "empty branch name is not allowed"
 
-	git switch \
-		--create "patchset/$branchname/v1.0" \
-		--track ${startpoint:+"$startpoint"} ||
-		fatal "unable to create new branch: patchset/$branchname/v1.0"
-
-	git config \
-		"branch.patchset/$branchname/v1.0.description" \
-		"*** SUBJECT HERE ***
+	local newver="v1.0"
+	local cover="*** SUBJECT HERE ***
 
 *** PATCHSET DESCRIPTION HERE ***
 
 --
-" ||
-		fatal "unable to write empty description for patchset/$branchname/v1.0"
+"
+	if [ -s "$mbox" ]; then
+		if ! type -p b4 >/dev/null; then
+			errmsg="the b4 utility is required to import mbox"
+			break
+		fi
 
-	git branch --edit-description "patchset/$branchname/v1.0" ||
-		fatal "unable to change description"
+		workdir="$(git rev-parse --absolute-git-dir)/$PROG.temp"
 
-	message "new patchset created: patchset/$branchname/v1.0"
+		if ! mkdir -- "$workdir"; then
+			workdir=''
+			exit 1
+		fi
+
+		b4 -q am -o "$workdir" -m "$mbox" ||
+			fatal "unable to create an mbox file that is ready to git-am"
+
+		local fn
+
+		fn="$(set +f && echo "$workdir"/*.mbx)"
+		[ -f "$fn" ] ||
+			fatal "unable to find created mbox"
+
+		mbox="$fn"
+
+		if [[ "${fn##*/}" =~ ^(v[0-9]+)_ ]]; then
+			newver="${BASH_REMATCH[1]}.0"
+		fi
+
+		fn="$(set +f && echo "$workdir"/*.cover)"
+		[ ! -s "$fn" ] ||
+			cover="$(builtin_cat < "$fn")"
+	fi
+
+	git switch \
+		--create "patchset/$branchname/$newver" \
+		--track ${startpoint:+"$startpoint"} ||
+		fatal "unable to create new branch: patchset/$branchname/$newver"
+
+	[ -z "$mbox" ] ||
+		git am -- "$mbox"
+
+	git config "branch.patchset/$branchname/$newver.description" "$cover" ||
+		fatal "unable to write empty description for patchset/$branchname/$newver"
+
+	[ -n "$mbox" ] ||
+		git branch --edit-description "patchset/$branchname/$newver" ||
+			fatal "unable to change description"
+
+	message "new patchset created: patchset/$branchname/$newver"
 }
 
 cmd_new()
@@ -1101,6 +1160,9 @@ chdir_to_toplevel
 
 [ "$#" != 0 ] || set -- list --latest --current
 cmd="$1"; shift
+
+trap exit_handler EXIT
+trap signal_handler HUP PIPE INT QUIT TERM
 
 __PATCHSET_HELP=
 n=unknown
