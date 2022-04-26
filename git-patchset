@@ -164,6 +164,7 @@ help_create()
 			                              based on some other point in history than where
 			                              HEAD currently points.
 			  -m, --use-local-mbox=FILE   process FILE mbox to import patchset.
+			  --no-edit-cover             do not offer to edit cover.
 			EOF
 			;;
 	esac
@@ -171,11 +172,14 @@ help_create()
 
 cmd_create()
 {
-	local args branchname='' startpoint='' mbox=''
+	local args branchname='' startpoint='' mbox='' no_edit_cover=''
 
 	args=()
 	while [ "$#" -gt 0 ]; do
 		case "$1" in
+			--no-edit-cover)
+				no_edit_cover=1
+				;;
 			-S|--start-point)
 				[ "$#" -gt 1 ] ||
 					fatal "argument required for $1 option"
@@ -280,7 +284,7 @@ $(<"$fn.msg")
 	git config "branch.patchset/$branchname/$newver.description" "$cover" ||
 		fatal "unable to write empty description for patchset/$branchname/$newver"
 
-	[ -n "$mbox" ] ||
+	[ -n "$mbox" ] || [ -n "$no_edit_cover" ] ||
 		git branch --edit-description "patchset/$branchname/$newver" ||
 			fatal "unable to change description"
 
