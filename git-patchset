@@ -1060,8 +1060,8 @@ cmd_send()
 		fatal "git-send-email(1) not found" ||:
 
 	if [ -n "$auto_export" ]; then
-		local dir branchname
-		current_patchset branchname
+		local dir patchset
+		current_patchset
 
 		dir="$(git rev-parse --absolute-git-dir; false)/$PROGCMD-send" ||
 			fatal "unable to find git directory"
@@ -1073,7 +1073,7 @@ cmd_send()
 			fatal "another git-$PROGCMD-send(1) in progress"
 		fi
 
-		cmd_export "$branchname" -o "$1" >/dev/null
+		cmd_export "${patchset[$P_FULL]}" -o "$1" >/dev/null
 	fi
 
 	local rc=0
