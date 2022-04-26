@@ -344,8 +344,8 @@ cmd_create()
 			return ;;
 		descr) printf '%s\n' \
 			"Creates branch for a new patchset. The new branch will be" \
-			"created with v1 version. The new branch head will point to" \
-			"<start-point> commit or to current commit."
+			"created with v1 version. the version and cover can be" \
+			"overwritten if commits are imported from mbox file."
 			return ;;
 		options) printf '%s\n' \
 			"" \
