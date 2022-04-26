@@ -99,7 +99,7 @@ builtin_cat()
 {
 	local s eof=
 	while [ -z "$eof" ]; do
-		read -N 1 s || eof=1
+		read -r -N 1 s || eof=1
 		printf '%s' "$s"
 	done
 }
@@ -446,8 +446,13 @@ cmd_create()
 		fi
 
 		fn="$(set +f && echo "$workdir"/*.cover)"
-		[ ! -s "$fn" ] ||
-			cover="$(builtin_cat < "$fn")"
+		if [ -s "$fn" ]; then
+			git mailinfo "$fn.msg" /dev/null < "$fn" > "$fn.info"
+			cover="$(sed -n -e 's/^Subject:[[:space:]]\+//p' "$fn.info")
+
+$(<"$fn.msg")
+"
+		fi
 	fi
 
 	git switch \
