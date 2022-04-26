@@ -1047,7 +1047,7 @@ help_archive()
 
 cmd_archive()
 {
-	local ver=v new='' args
+	local ver=l new='' args
 
 	args=()
 
@@ -1074,6 +1074,10 @@ cmd_archive()
 	case "$ver" in
 		a) new=v ;;
 		v) new=a ;;
+		l)
+			cmd_list --archive
+			return
+			;;
 	esac
 
 	if [ "$#" -gt 0 ]; then
