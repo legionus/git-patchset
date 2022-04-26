@@ -60,21 +60,34 @@ signal_handler() { cleanup_handler  1; }
 # out: "patchset/sysctl-ipc/v1.0" "sysctl-ipc" "1.0"
 parse_patchset()
 {
+	local __sref __name __vers
 	if [[ "$1" =~ ^(refs/)?(heads/)?(patchset/([^/]+)/[av]([0-9]+.[0-9]+)) ]]; then
-		eval "$2=\"\${BASH_REMATCH[3]}\""
-		shift 2
-
-		if [ "$#" -gt 0 ]; then
-			eval "$1=\"\${BASH_REMATCH[4]}\""
-			shift
-		fi
-		if [ "$#" -gt 0 ]; then
-			eval "$1=\"\${BASH_REMATCH[5]}\""
-			shift
-		fi
+		__sref="${BASH_REMATCH[3]}"
+		__name="${BASH_REMATCH[4]}"
+		__vers="${BASH_REMATCH[5]}"
+	elif [[ "$1" =~ ^(([^/]+)/[av]([0-9]+.[0-9]+)) ]]; then
+		__sref="patchset/${BASH_REMATCH[1]}"
+		__name="${BASH_REMATCH[2]}"
+		__vers="${BASH_REMATCH[3]}"
 	else
 		fatal "branch is not a patchset: $1"
 	fi
+
+	git rev-parse "$__sref" >/dev/null 2>&1 ||
+		fatal "unknown branch: $1"
+
+	eval "$2=\"\$__sref\""
+	shift 2
+
+	if [ "$#" -gt 0 ]; then
+		eval "$1=\"\$__name\""
+		shift
+	fi
+	if [ "$#" -gt 0 ]; then
+		eval "$1=\"\$__vers\""
+		shift
+	fi
+
 }
 
 current_patchset()
@@ -422,8 +435,6 @@ cmd_config()
 	set -- "${args[@]}" "$@"
 
 	if [ "$#" != 0 ]; then
-		git rev-parse "$1" >/dev/null 2>&1 ||
-			fatal "unknown branch: $1"
 		branchname="$1"
 		shift
 	fi
@@ -593,8 +604,6 @@ cmd_list()
 	case "$mode" in
 		versions)
 			if [ "$#" != 0 ]; then
-				git rev-parse "$1" >/dev/null 2>&1 ||
-					fatal "unknown branch: $1"
 				name="$1"
 				shift
 			fi
@@ -615,7 +624,7 @@ cmd_list()
 
 	{
 		git for-each-ref \
-			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
+			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=3)' \
 			"refs/heads/patchset/$curname/$ver[0-9]*" |
 			sort -V -t\  -k3,3
 		printf '\n'
@@ -636,7 +645,7 @@ cmd_list()
 					;;
 			esac
 
-			basecommit="$(basecommit_for "$branchname")" ||
+			basecommit="$(basecommit_for "patchset/$branchname")" ||
 				break
 
 			[ "$mark" = '*' ] &&
@@ -703,8 +712,6 @@ cmd_version()
 	done
 
 	if [ "$#" != 0 ]; then
-		git rev-parse "$1" >/dev/null 2>&1 ||
-			fatal "unknown branch: $1"
 		branchname="$1"
 		shift
 	fi
@@ -803,8 +810,6 @@ cmd_cover()
 	set -- "${args[@]}" "$@"
 
 	if [ "$#" != 0 ]; then
-		git rev-parse "$1" >/dev/null 2>&1 ||
-			fatal "unknown branch: $1"
 		branchname="$1"
 		shift
 	fi
@@ -855,10 +860,8 @@ cmd_log()
 	local branchname=''
 
 	if [ "$#" != 0 ]; then
-		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
-			branchname="$1"
-			shift
-		fi
+		branchname="$1"
+		shift
 	fi
 
 	[ -n "$branchname" ] &&
@@ -932,10 +935,8 @@ cmd_export()
 	set -- "${args[@]}" "$@"
 
 	if [ "$#" != 0 ]; then
-		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
-			branchname="$1"
-			shift
-		fi
+		branchname="$1"
+		shift
 	fi
 
 	[ -n "$branchname" ] &&
