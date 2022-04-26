@@ -350,7 +350,7 @@ cmd_create()
 		options) printf '%s\n' \
 			"" \
 			"Options:" \
-			"  -s, --start-point=COMMIT   specifying a COMMIT allows you to create a branch" \
+			"  -S, --start-point=COMMIT   specifying a COMMIT allows you to create a branch" \
 			"                             based on some other point in history than where" \
 			"                             HEAD currently points." \
 			"  -m, --use-local-mbox=FILE  process FILE mbox to import patchset."
@@ -362,7 +362,7 @@ cmd_create()
 	args=()
 	while [ "$#" -gt 0 ]; do
 		case "$1" in
-			-s|--start-point)
+			-S|--start-point)
 				[ "$#" -gt 1 ] ||
 					fatal "argument required for $1 option"
 				startpoint="$2"
