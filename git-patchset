@@ -104,77 +104,6 @@ builtin_cat()
 	done
 }
 
-cmd_help()
-{
-	case "$__PATCHSET_HELP" in
-		usage) printf '[<command>]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Shows this message and exit."
-			return ;;
-		options)
-			return ;;
-	esac
-
-	local n cmd= found=
-	[ "$#" = 0 ] || cmd="$1"
-
-	set -- create config new list cover log export send archive help
-
-	if [ -n "$cmd" ]; then
-		for n in "$@"; do
-			[ "$n" != "$cmd" ] || found=1
-		done
-		[ -n "$found" ] ||
-			fatal "unknown command: $cmd"
-		local prefix='Usage:'
-		__PATCHSET_HELP=usage "cmd_$cmd" |
-		while IFS='' read -r options; do
-			printf '%s git %s %s %s\n' "$prefix" "$PROGCMD" "$cmd" "$options"
-			prefix='   or:'
-		done
-		builtin_cat <<-EOF
-
-		`
-		__PATCHSET_HELP=descr   "cmd_$cmd"
-		__PATCHSET_HELP=options "cmd_$cmd"
-		`
-
-		Report bugs to authors.
-
-		EOF
-		exit
-	fi
-
-	builtin_cat <<-EOF
-	Usage: git $PROGCMD [<command>] [<args>]
-	`for n in "$@"; do
-		__PATCHSET_HELP=usage "cmd_$n" |
-		while IFS='' read -r options; do
-			printf '   or: git %s %s %s\n' "$PROGCMD" "$n" "$options"
-		done
-	done`
-
-	This is highlevel utility for easy patchset creation. Each patchset has
-	a version and description.
-
-	Commands:
-
-	`for n in "$@"; do
-		__PATCHSET_HELP=descr "cmd_$n" |
-		while read -r s; do
-			printf "%-10s%s\n" "$n" "$s"
-			n=
-		done
-		printf '\n'
-	done`
-
-	Report bugs to authors.
-
-	EOF
-	exit
-}
-
 get_pager()
 {
 	local __get_pager
@@ -214,149 +143,31 @@ basecommit_for()
 	}
 }
 
-cmd_list()
+help_create()
 {
-	case "$__PATCHSET_HELP" in
-		usage) printf '[--all|--latest|--versions] [--archive]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Shows a list of known patchsets. The current patchset will" \
-			"be marked with an asterisk. The list also shows the base and" \
-			"last commits as well as the number of commits."
-			return ;;
-		options) printf '%s\n' \
-			"" \
-			"Options:" \
-			"  --all        show all versions of all patchsets." \
-			"  --latest     show only latest versions of patchsets." \
-			"  --versions   show all versions of current patchset." \
-			"  --archive    show archived patchsets"
-			return ;;
-	esac
-
-	local mode='' ver=v show_current=''
-
-	while [ "$#" != 0 ]; do
-		case "$1" in
-			--all|--latest|--versions)
-				mode="${1#--}"
-				;;
-			--archive)
-				mode="${mode:-latest}"
-				ver=a
-				;;
-			--current)
-				show_current=1
-				;;
-			*)
-				break
-				;;
-		esac
-		shift
-	done
-
-	mode="${mode:-all}"
-
-	local ColorRange='' ColorReset='' ColorCurrent='' ColorDefault=''
-
-	if [ "$color" = always ]; then
-		ColorDefault="$(git config --get-color "" "white")"
-		ColorCurrent="$(git config --get-color "" "bold")"
-		ColorRange="$(  git config --get-color "" "yellow")"
-		ColorReset="$(  git config --get-color "" "reset")"
-	fi
-
-	local curbranch='' curname=''
-
-	case "$mode" in
-		versions)
-			if [ "$#" != 0 ]; then
-				git rev-parse "$1" >/dev/null 2>&1 ||
-					fatal "unknown branch: $1"
-				name="$1"
-				shift
-			fi
-
-			[ -n "${name-}" ] &&
-				parse_patchset "$name" curbranch curname ||
-				current_patchset curbranch curname
+	case "$1" in
+		usage) printf 'create <newname> [options]\n'
 			;;
-		*)
+		descr) builtin_cat <<-EOF
+			Creates branch for a new patchset. The new branch will be
+			created with v1 version. the version and cover can be
+			overwritten if commits are imported from mbox file.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  -S, --start-point=COMMIT    specifying a COMMIT allows you to create a branch
+			                              based on some other point in history than where
+			                              HEAD currently points.
+			  -m, --use-local-mbox=FILE   process FILE mbox to import patchset.
+			EOF
 			;;
 	esac
-
-	[ "$#" = 0 ] ||
-		fatal "too many arguments"
-
-	[ "$mode" = 'versions' ] ||
-		curname='*'
-
-	{
-		git for-each-ref \
-			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
-			"refs/heads/patchset/$curname/$ver[0-9]*" |
-			sort -V -t\  -k3,3
-		printf '\n'
-	} |
-	while read -r on_mark on_objectname on_branchname; do
-		on_patchset="${on_branchname%/$ver*}"
-
-		while [ -n "${branchname-}" ]; do
-			case "$mode" in
-				all|versions)
-					;;
-				latest)
-					if [ -n "$show_current" ] && [ "$branchname" = "$curbranch" ]; then
-						:;
-					elif [ "${prev_patchset:-$on_patchset}" = "$on_patchset" ]; then
-						break
-					fi
-					;;
-			esac
-
-			basecommit="$(basecommit_for "$branchname")" ||
-				break
-
-			[ "$mark" = '*' ] &&
-				current="$ColorCurrent" ||
-				current=''
-
-			printf '%1s %s..%s %7s %s%s\n' \
-				"${current}${ColorDefault}${mark}" \
-				"${ColorRange}${basecommit}" \
-				"${objectname}${ColorDefault}" \
-				"($(git rev-list --count "$basecommit..$objectname"))" \
-				"${branchname}${ColorReset}"
-			break
-		done
-
-		mark="$on_mark"
-		objectname="$on_objectname"
-		branchname="$on_branchname"
-		prev_patchset="$on_patchset"
-	done
 }
 
 cmd_create()
 {
-	case "$__PATCHSET_HELP" in
-		usage) printf '<newname> [options]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Creates branch for a new patchset. The new branch will be" \
-			"created with v1 version. the version and cover can be" \
-			"overwritten if commits are imported from mbox file."
-			return ;;
-		options) printf '%s\n' \
-			"" \
-			"Options:" \
-			"  -S, --start-point=COMMIT   specifying a COMMIT allows you to create a branch" \
-			"                             based on some other point in history than where" \
-			"                             HEAD currently points." \
-			"  -m, --use-local-mbox=FILE  process FILE mbox to import patchset."
-			return ;;
-	esac
-
 	local args branchname='' startpoint='' mbox=''
 
 	args=()
@@ -473,97 +284,6 @@ $(<"$fn.msg")
 	message "new patchset created: patchset/$branchname/$newver"
 }
 
-cmd_new()
-{
-	case "$__PATCHSET_HELP" in
-		usage) printf '[--major|--minor] [<patchset>] [number]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Creates branch for a new version of <patchset>. Branch will" \
-			"copy the description and recipient list."
-			return ;;
-		options) printf '%s\n' \
-			"" \
-			"Options:" \
-			"  --major   increment major version number." \
-			"  --minor   increment minor version number."
-			return ;;
-	esac
-
-	local newname='' newver='' branchname='' name='' ver='' inc=''
-
-	while [ "$#" != 0 ]; do
-		case "$1" in
-			--minor)
-				inc=minor
-				;;
-			--major)
-				inc=major
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-				break
-				;;
-		esac
-		shift
-	done
-
-	if [ "$#" != 0 ]; then
-		git rev-parse "$1" >/dev/null 2>&1 ||
-			fatal "unknown branch: $1"
-		branchname="$1"
-		shift
-	fi
-
-	if [ "$#" != 0 ]; then
-		newver="${1#[av]}"
-		shift
-	fi
-
-	[ "$#" = 0 ] ||
-		fatal "too many arguments"
-
-	[ -n "$branchname" ] &&
-		parse_patchset "$branchname" branchname name ver ||
-		current_patchset branchname name ver
-
-	if [ -z "$newver" ]; then
-		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$name/" |
-			sed -e 's/^.*\/[av]//' |
-			sort --version-sort |
-			tail -1)"
-		newver="${newver:-1}"
-
-		if [ -z "${newver##*.[0-9]*}" ]; then
-			case "${inc:-minor}" in
-				major) newver="$((${newver%%.*} + 1)).0" ;;
-				minor) newver="${newver%.*}.$((${newver##*.} + 1))" ;;
-			esac
-		else
-			case "${inc:-major}" in
-				major) newver="$(($newver + 1))" ;;
-				minor) newver="$(($newver + 1)).0" ;;
-			esac
-		fi
-	fi
-
-	newname="patchset/$name/v$newver"
-
-	! git rev-parse "$newname" >/dev/null 2>&1 ||
-		fatal "$newname: branch already exists"
-
-	git branch -c "$branchname" "$newname" ||
-		fatal "unable to copy '$branchname' branch"
-
-	git switch "$newname" ||
-		fatal "unable to switch to '$newname'"
-
-	message "new patchset version created: $newname"
-}
-
 describe_patchset()
 {
 	local branchname basecommit subject_prefix ver
@@ -651,27 +371,33 @@ fetch_config_section()
 	done
 }
 
+help_config()
+{
+	case "$1" in
+		usage) builtin_cat <<-EOF
+			config [-e|--edit] [<patchset>]
+			config [--global] [--to=<email>] [--cc=<email>] [<patchset>]
+			EOF
+			;;
+		descr) builtin_cat <<-EOF
+			Changes options of the patchset. You can always change or delete To
+			and Cc fields using the \`git config -e'.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  -e, --edit      open editor to change options.
+			  --to=<email>    add a To: header to the email headers.
+			  --cc=<email>    add a Cc: header to the email headers.
+			  --global        add <email> globally for all patchsets.
+			EOF
+			;;
+	esac
+}
+
 cmd_config()
 {
-	case "$__PATCHSET_HELP" in
-		usage) printf '%s\n' \
-			'[-e|--edit] [<patchset>]' \
-			'[--global] [--to=<email>] [--cc=<email>] [<patchset>]'
-			return ;;
-		descr) printf '%s\n' \
-			"Changes options of the patchset. You can always change or delete To" \
-			"and Cc fields using the \`git config -e'."
-			return ;;
-		options) printf '%s\n' \
-			"" \
-			"Options:" \
-			"  -e, --edit      open editor to change options." \
-			"  --to=<email>    add a To: header to the email headers." \
-			"  --cc=<email>    add a Cc: header to the email headers." \
-			"  --global        add <email> globally for all patchsets."
-			return ;;
-	esac
-
 	local branchname='' name='' ver='' mode=edit
 	local to cc args cfg_prefix=''
 
@@ -815,23 +541,252 @@ EOF
 
 }
 
-cmd_cover()
+help_list()
 {
-	case "$__PATCHSET_HELP" in
-		usage) printf '[-e|--edit] [--no-pager] [<patchset>]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Shows or changes the description of the patchset. This description" \
-			"will be used for cover-letter."
-			return ;;
-		options) printf '%s\n' \
-			"" \
-			"Options:" \
-			"  -e, --edit      open editor to change the description." \
-			"  --no-pager      do not pipe git output into a pager."
-			return ;;
+	case "$1" in
+		usage) printf 'list [--all|--latest|--versions] [--archive]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Shows a list of known patchsets. The current patchset will
+			be marked with an asterisk. The list also shows the base and
+			last commits as well as the number of commits.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  --all        show all versions of all patchsets.
+			  --latest     show only latest versions of patchsets.
+			  --versions   show all versions of current patchset.
+			  --archive    show archived patchsets.
+			EOF
+			;;
+	esac
+}
+
+cmd_list()
+{
+	local mode='' ver=v show_current=''
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			--all|--latest|--versions)
+				mode="${1#--}"
+				;;
+			--archive)
+				mode="${mode:-latest}"
+				ver=a
+				;;
+			--current)
+				show_current=1
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
+
+	mode="${mode:-all}"
+
+	local ColorRange='' ColorReset='' ColorCurrent='' ColorDefault=''
+
+	if [ "$color" = always ]; then
+		ColorDefault="$(git config --get-color "" "white")"
+		ColorCurrent="$(git config --get-color "" "bold")"
+		ColorRange="$(  git config --get-color "" "yellow")"
+		ColorReset="$(  git config --get-color "" "reset")"
+	fi
+
+	local curbranch='' curname=''
+
+	case "$mode" in
+		versions)
+			if [ "$#" != 0 ]; then
+				git rev-parse "$1" >/dev/null 2>&1 ||
+					fatal "unknown branch: $1"
+				name="$1"
+				shift
+			fi
+
+			[ -n "${name-}" ] &&
+				parse_patchset "$name" curbranch curname ||
+				current_patchset curbranch curname
+			;;
+		*)
+			;;
 	esac
 
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
+
+	[ "$mode" = 'versions' ] ||
+		curname='*'
+
+	{
+		git for-each-ref \
+			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
+			"refs/heads/patchset/$curname/$ver[0-9]*" |
+			sort -V -t\  -k3,3
+		printf '\n'
+	} |
+	while read -r on_mark on_objectname on_branchname; do
+		on_patchset="${on_branchname%/$ver*}"
+
+		while [ -n "${branchname-}" ]; do
+			case "$mode" in
+				all|versions)
+					;;
+				latest)
+					if [ -n "$show_current" ] && [ "$branchname" = "$curbranch" ]; then
+						:;
+					elif [ "${prev_patchset:-$on_patchset}" = "$on_patchset" ]; then
+						break
+					fi
+					;;
+			esac
+
+			basecommit="$(basecommit_for "$branchname")" ||
+				break
+
+			[ "$mark" = '*' ] &&
+				current="$ColorCurrent" ||
+				current=''
+
+			printf '%1s %s..%s %7s %s%s\n' \
+				"${current}${ColorDefault}${mark}" \
+				"${ColorRange}${basecommit}" \
+				"${objectname}${ColorDefault}" \
+				"($(git rev-list --count "$basecommit..$objectname"))" \
+				"${branchname}${ColorReset}"
+			break
+		done
+
+		mark="$on_mark"
+		objectname="$on_objectname"
+		branchname="$on_branchname"
+		prev_patchset="$on_patchset"
+	done
+}
+
+help_new()
+{
+	case "$1" in
+		usage) printf 'new [--major|--minor] [<patchset>] [number]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Creates branch for a new version of <patchset>. Branch will
+			copy the description and recipient list.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  --major   increment major version number.
+			  --minor   increment minor version number.
+			EOF
+			;;
+	esac
+}
+
+cmd_new()
+{
+	local newname='' newver='' branchname='' name='' ver='' inc=''
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			--minor)
+				inc=minor
+				;;
+			--major)
+				inc=major
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
+
+	if [ "$#" != 0 ]; then
+		git rev-parse "$1" >/dev/null 2>&1 ||
+			fatal "unknown branch: $1"
+		branchname="$1"
+		shift
+	fi
+
+	if [ "$#" != 0 ]; then
+		newver="${1#[av]}"
+		shift
+	fi
+
+	[ "$#" = 0 ] ||
+		fatal "too many arguments"
+
+	[ -n "$branchname" ] &&
+		parse_patchset "$branchname" branchname name ver ||
+		current_patchset branchname name ver
+
+	if [ -z "$newver" ]; then
+		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$name/" |
+			sed -e 's/^.*\/[av]//' |
+			sort --version-sort |
+			tail -1)"
+		newver="${newver:-1}"
+
+		if [ -z "${newver##*.[0-9]*}" ]; then
+			case "${inc:-minor}" in
+				major) newver="$((${newver%%.*} + 1)).0" ;;
+				minor) newver="${newver%.*}.$((${newver##*.} + 1))" ;;
+			esac
+		else
+			case "${inc:-major}" in
+				major) newver="$(($newver + 1))" ;;
+				minor) newver="$(($newver + 1)).0" ;;
+			esac
+		fi
+	fi
+
+	newname="patchset/$name/v$newver"
+
+	! git rev-parse "$newname" >/dev/null 2>&1 ||
+		fatal "$newname: branch already exists"
+
+	git branch -c "$branchname" "$newname" ||
+		fatal "unable to copy '$branchname' branch"
+
+	git switch "$newname" ||
+		fatal "unable to switch to '$newname'"
+
+	message "new patchset version created: $newname"
+}
+
+help_cover()
+{
+	case "$1" in
+		usage) printf 'cover [-e|--edit] [--no-pager] [<patchset>]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Shows or changes the description of the patchset. This description
+			will be used for cover-letter.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  -e, --edit      open editor to change the description.
+			  --no-pager      do not pipe git output into a pager.
+			EOF
+			;;
+	esac
+}
+
+cmd_cover()
+{
 	local branchname='' name='' ver='' mode=list use_pager=1 pager=''
 	local to cc args
 
@@ -889,25 +844,67 @@ cmd_cover()
 	esac
 }
 
+help_log()
+{
+	case "$1" in
+		usage) printf 'log [<patchset>] [options]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Shortcut for git-log(1) to display patchset changes. The <options>
+			will be passed to git-log(1). Without any options, the command will
+			show changes in the current patchset.
+			EOF
+			;;
+		options)
+			;;
+	esac
+}
+
+cmd_log()
+{
+	local branchname=''
+
+	if [ "$#" != 0 ]; then
+		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
+			branchname="$1"
+			shift
+		fi
+	fi
+
+	[ -n "$branchname" ] &&
+		parse_patchset "$branchname" branchname ||
+		current_patchset branchname
+
+	basecommit="$(basecommit_for "$branchname")" ||
+		return 1
+
+	git log "$@" "$basecommit..$branchname"
+}
+
+help_export()
+{
+	case "$1" in
+		usage) printf 'export [--resend] [--rfc] [(-o|--output-directory) DIR] [<patchset>] [<options>]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Prepares patches for e-mail submission. The <options> will be passed
+			to git-format-patch(1).
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  -o, --output-directory DIR    use <DIR> to store the resulting files
+			                                (default: patches/PATCHSET/)
+			  --resend                      shortcut to add RESEND tag to the subject.
+			  --rfc                         shortcut to add RFC tag to the subject.
+			EOF
+			;;
+	esac
+}
+
 cmd_export()
 {
-	case "$__PATCHSET_HELP" in
-		usage) printf '[--resend] [--rfc] [(-o|--output-directory) DIR] [<patchset>] [<options>]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Prepares patches for e-mail submission. The <options> will be passed" \
-			"to git-format-patch(1)."
-			return ;;
-		options) printf '%s\n' \
-			"" \
-			"Options:" \
-			"  -o, --output-directory DIR    use <DIR> to store the resulting files" \
-			"                                (default: patches/PATCHSET/)" \
-			"  --resend                      shortcut to add RESEND tag to the subject." \
-			"  --rfc                         shortcut to add RFC tag to the subject."
-			return ;;
-	esac
-
 	local subject_prefix='' branchname='' basecommit name ver arr args
 	local resend='' rfc='' outdir=''
 
@@ -1009,20 +1006,24 @@ cmd_export()
 		"$@" "$basecommit..$branchname"
 }
 
+help_send()
+{
+	case "$1" in
+		usage) printf 'send [[<options>] <files|directory>]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Sends patches by e-mail. The <options> will be passed
+			to git-send-email(1). Without any options, the command
+			will export current patchset itself.
+			EOF
+			;;
+		options)
+			;;
+	esac
+}
+
 cmd_send()
 {
-	case "$__PATCHSET_HELP" in
-		usage) printf '[[<options>] <files|directory>]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Sends patches by e-mail. The <options> will be passed" \
-			"to git-send-email(1). Without any options, the command" \
-			"will export current patchset itself."
-			return ;;
-		options)
-			return ;;
-	esac
-
 	local auto_export=''
 
 	[ "$#" != 0 ] ||
@@ -1059,23 +1060,28 @@ cmd_send()
 	return $rc
 }
 
+help_archive()
+{
+	case "$1" in
+		usage) printf 'archive [--add|--restore] [<patchset>]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Archive or unarchive the patchset. The specified version will be
+			ignored. The archived patchset is not listed by default.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  -a, --add       Move all versions of patchset to archive.
+			  -r, --restore   Restore all versions of patchset.
+			EOF
+			;;
+	esac
+}
+
 cmd_archive()
 {
-	case "$__PATCHSET_HELP" in
-		usage) printf '[--add|--restore] [<patchset>]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Archive or unarchive the patchset. The specified version will be "\
-			"ignored. The archived patchset is not listed by default."
-			return ;;
-		options) printf '%s\n' \
-			"" \
-			"Options:" \
-			"  -a, --add       Move all versions of patchset to archive." \
-			"  -r, --restore   Restore all versions of patchset."
-			return ;;
-	esac
-
 	local ver=v new='' branchname='' args
 
 	args=()
@@ -1140,42 +1146,84 @@ cmd_archive()
 	done
 }
 
-cmd_log()
+help_help()
 {
-	case "$__PATCHSET_HELP" in
-		usage) printf '[<patchset>] [options]\n'
-			return ;;
-		descr) printf '%s\n' \
-			"Shortcut for git-log(1) to display patchset changes. The <options>"\
-			" will be passed to git-log(1). Without any options, the command will" \
-			"show changes in the current patchset."
-			return ;;
+	case "$1" in
+		usage) printf 'help [<command>]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Shows this message and exit.
+			EOF
+			;;
 		options)
-			return ;;
+			;;
 	esac
-
-	local branchname=''
-
-	if [ "$#" != 0 ]; then
-		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
-			branchname="$1"
-			shift
-		fi
-	fi
-
-	[ -n "$branchname" ] &&
-		parse_patchset "$branchname" branchname ||
-		current_patchset branchname
-
-	basecommit="$(basecommit_for "$branchname")" ||
-		return 1
-
-	git log "$@" "$basecommit..$branchname"
 }
 
-cmd_unknown()
+commands=(`sed -n -e 's/^help_\([^[:space:]]\+\)().*/\1/p' "$0"`)
+help_()
 {
-	fatal "unknown command: $cmd"
+	local n s
+	case "$1" in
+		usage) printf '[<command>] [<args>]\n'
+			for n in "${commands[@]}"; do
+				"help_$n" usage
+			done
+			;;
+		descr) builtin_cat <<-EOF
+			This is highlevel utility for easy patchset creation. Each patchset has
+			a version and description.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Commands:
+
+			EOF
+			for n in "${commands[@]}"; do
+				"help_$n" descr |
+				while read -r s; do
+					printf "%-10s%s\n" "$n" "$s"
+					n=
+				done
+				printf '\n'
+			done
+			;;
+	esac
+}
+
+cmd_help()
+{
+	local n cmd='' found=''
+
+	if [ "$#" -gt 0 ]; then
+		cmd="$1"
+
+		for n in "${commands[@]}"; do
+			[ "$n" != "$cmd" ] || found=1
+		done
+
+		[ -n "$found" ] ||
+			fatal "unknown command: $cmd"
+	fi
+
+	local prefix='Usage:'
+	"help_$cmd" usage |
+	while IFS='' read -r options; do
+		printf '%s git %s %s\n' "$prefix" "$PROGCMD" "$options"
+		prefix='   or:'
+	done
+	builtin_cat <<-EOF
+
+	`
+	"help_$cmd" descr
+	"help_$cmd" options
+	`
+
+	Report bugs to authors.
+
+	EOF
+	exit
 }
 
 chdir_to_toplevel
@@ -1185,9 +1233,6 @@ cmd="$1"; shift
 
 trap exit_handler EXIT
 trap signal_handler HUP PIPE INT QUIT TERM
-
-__PATCHSET_HELP=
-n=unknown
 
 case "$cmd" in
 	-h|help)
@@ -1204,6 +1249,9 @@ case "$cmd" in
 		;;
 	config|cover|new|log|send|archive)
 		n="$cmd"
+		;;
+	*)
+		fatal "unknown command: $cmd"
 		;;
 esac
 
