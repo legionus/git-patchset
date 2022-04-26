@@ -1223,7 +1223,6 @@ cmd_help()
 	Report bugs to authors.
 
 	EOF
-	exit
 }
 
 chdir_to_toplevel
@@ -1235,24 +1234,14 @@ trap exit_handler EXIT
 trap signal_handler HUP PIPE INT QUIT TERM
 
 case "$cmd" in
-	-h|help)
-		n="help"
-		;;
-	cr|create)
-		n="create"
-		;;
-	ex|export)
-		n="export"
-		;;
-	ls|list)
-		n="list"
-		;;
+	-h|help)	cmd_help	"$@"	;;
+	cr|create)	cmd_create	"$@"	;;
+	ex|export)	cmd_export	"$@"	;;
+	ls|list)	cmd_list	"$@"	;;
 	config|cover|new|log|send|archive)
-		n="$cmd"
-		;;
+			cmd_"$cmd"	"$@"	;;
 	*)
 		fatal "unknown command: $cmd"
 		;;
 esac
 
-"cmd_$n" "$@"
