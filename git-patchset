@@ -673,9 +673,9 @@ cmd_config()
 	esac
 
 	local branchname='' name='' ver='' mode=edit
-	local to cc cfg_prefix=''
+	local to cc args cfg_prefix=''
 
-	to=(); cc=();
+	to=(); cc=(); args=();
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -698,11 +698,12 @@ cmd_config()
 				break
 				;;
 			*)
-				break
+				args+=("$1")
 				;;
 		esac
 		shift
 	done
+	set -- "${args[@]}" "$@"
 
 	if [ "$#" != 0 ]; then
 		git rev-parse "$1" >/dev/null 2>&1 ||
@@ -832,8 +833,9 @@ cmd_cover()
 	esac
 
 	local branchname='' name='' ver='' mode=list use_pager=1 pager=''
+	local to cc args
 
-	to=(); cc=();
+	to=(); cc=(); args=();
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -848,11 +850,12 @@ cmd_cover()
 				break
 				;;
 			*)
-				break
+				args+=("$1")
 				;;
 		esac
 		shift
 	done
+	set -- "${args[@]}" "$@"
 
 	if [ "$#" != 0 ]; then
 		git rev-parse "$1" >/dev/null 2>&1 ||
@@ -905,8 +908,10 @@ cmd_export()
 			return ;;
 	esac
 
-	local subject_prefix='' branchname='' basecommit name ver arr
+	local subject_prefix='' branchname='' basecommit name ver arr args
 	local resend='' rfc='' outdir=''
+
+	args=()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -932,11 +937,12 @@ cmd_export()
 				break
 				;;
 			*)
-				break
+				args+=("$1")
 				;;
 		esac
 		shift
 	done
+	set -- "${args[@]}" "$@"
 
 	if [ "$#" != 0 ]; then
 		if [ -n "$1" ] && [ -z "${1##patchset/*}" ] && git rev-parse "$1" >/dev/null 2>&1; then
@@ -1070,7 +1076,9 @@ cmd_archive()
 			return ;;
 	esac
 
-	local ver=v new='' branchname=''
+	local ver=v new='' branchname='' args
+
+	args=()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -1085,11 +1093,12 @@ cmd_archive()
 				break
 				;;
 			*)
-				break
+				args+=("$1")
 				;;
 		esac
 		shift
 	done
+	set -- "${args[@]}" "$@"
 
 	case "$ver" in
 		a) new=v ;;
