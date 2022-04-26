@@ -56,35 +56,25 @@ cleanup_handler()
 exit_handler()   { cleanup_handler $?; }
 signal_handler() { cleanup_handler  1; }
 
+# in: refs/heads/patchset/sysctl-ipc/v1.0
+# out: "patchset/sysctl-ipc/v1.0" "sysctl-ipc" "1.0"
 parse_patchset()
 {
-	local __v='' __n="$1"
+	if [[ "$1" =~ ^(refs/)?(heads/)?(patchset/([^/]+)/[av]([0-9]+.[0-9]+)) ]]; then
+		eval "$2=\"\${BASH_REMATCH[3]}\""
+		shift 2
 
-	__n="${__n#refs/}"
-	__n="${__n#heads/}"
-
-	[ -z "${__n##patchset/*}" ] ||
+		if [ "$#" -gt 0 ]; then
+			eval "$1=\"\${BASH_REMATCH[4]}\""
+			shift
+		fi
+		if [ "$#" -gt 0 ]; then
+			eval "$1=\"\${BASH_REMATCH[5]}\""
+			shift
+		fi
+	else
 		fatal "branch is not a patchset: $1"
-	shift
-
-	eval "$1=\"\$__n\""
-	shift
-
-	[ "$#" != 0 ] || return 0
-
-	[ -n "${__n##*/[av][0-9]*}" ] ||
-		__v="${__n##*/[av]}"
-
-	__n="${__n#patchset/}"
-	__n="${__n%/[av]$__v}"
-
-	eval "$1=\"\$__n\""
-	shift
-
-	[ "$#" != 0 ] || return 0
-
-	eval "$1=\"\$__v\""
-	shift
+	fi
 }
 
 current_patchset()
