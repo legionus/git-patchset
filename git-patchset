@@ -146,11 +146,12 @@ help_create()
 		options) builtin_cat <<-EOF
 
 			Options:
+			  --no-edit-cover             do not offer to edit cover.
 			  -S, --start-point=COMMIT    specifying a COMMIT allows you to create a branch
 			                              based on some other point in history than where
 			                              HEAD currently points.
 			  -m, --use-local-mbox=FILE   process FILE mbox to import patchset.
-			  --no-edit-cover             do not offer to edit cover.
+			  -h, --help                  show this text and exit.
 			EOF
 			;;
 	esac
@@ -163,6 +164,10 @@ cmd_create()
 	args=()
 	while [ "$#" -gt 0 ]; do
 		case "$1" in
+			-h|--help)
+				cmd_help create
+				return
+				;;
 			--no-edit-cover)
 				no_edit_cover=1
 				;;
@@ -380,10 +385,11 @@ help_config()
 		options) builtin_cat <<-EOF
 
 			Options:
-			  -e, --edit      open editor to change options.
+			  --global        add <email> globally for all patchsets.
 			  --to=<email>    add a To: header to the email headers.
 			  --cc=<email>    add a Cc: header to the email headers.
-			  --global        add <email> globally for all patchsets.
+			  -e, --edit      open editor to change options.
+			  -h, --help      show this text and exit.
 			EOF
 			;;
 	esac
@@ -398,6 +404,10 @@ cmd_config()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
+			-h|--help)
+				cmd_help config
+				return
+				;;
 			-e|--edit)
 				mode=edit
 				;;
@@ -548,6 +558,7 @@ help_list()
 			  --latest     show only latest versions of patchsets.
 			  --versions   show all versions of current patchset.
 			  --archive    show archived patchsets.
+			  -h, --help   show this text and exit.
 			EOF
 			;;
 	esac
@@ -559,6 +570,10 @@ cmd_list()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
+			-h|--help)
+				cmd_help list
+				return
+				;;
 			--all|--latest|--versions)
 				mode="${1#--}"
 				;;
@@ -663,8 +678,9 @@ help_version()
 		options) builtin_cat <<-EOF
 
 			Options:
-			  --major   increment major version number.
-			  --minor   increment minor version number.
+			  --major      increment major version number.
+			  --minor      increment minor version number.
+			  -h, --help   show this text and exit.
 			EOF
 			;;
 	esac
@@ -676,6 +692,10 @@ cmd_version()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
+			-h|--help)
+				cmd_help version
+				return
+				;;
 			--minor)
 				inc=minor
 				;;
@@ -755,8 +775,9 @@ help_cover()
 		options) builtin_cat <<-EOF
 
 			Options:
-			  -e, --edit      open editor to change the description.
-			  --no-pager      do not pipe git output into a pager.
+			  --no-pager   do not pipe git output into a pager.
+			  -e, --edit   open editor to change the description.
+			  -h, --help   show this text and exit.
 			EOF
 			;;
 	esac
@@ -771,6 +792,10 @@ cmd_cover()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
+			-h|--help)
+				cmd_help cover
+				return
+				;;
 			-e|--edit)
 				mode=edit
 				;;
@@ -835,7 +860,22 @@ help_log()
 
 cmd_log()
 {
-	local basecommit patchset
+	local basecommit patchset args
+	args=()
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			-h|--help)
+				cmd_help log
+				return
+				;;
+			*)
+				args+=("$1")
+				;;
+		esac
+		shift
+	done
+	set -- "${args[@]}"
 
 	if [ "$#" -gt 0 ]; then
 		parse_patchset "$1"
@@ -863,10 +903,11 @@ help_export()
 		options) builtin_cat <<-EOF
 
 			Options:
-			  -o, --output-directory DIR    use <DIR> to store the resulting files
-			                                (default: patches/PATCHSET/)
 			  --resend                      shortcut to add RESEND tag to the subject.
 			  --rfc                         shortcut to add RFC tag to the subject.
+			  -o, --output-directory DIR    use <DIR> to store the resulting files
+			                                (default: patches/PATCHSET/)
+			  -h, --help                    show this text and exit.
 			EOF
 			;;
 	esac
@@ -881,6 +922,10 @@ cmd_export()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
+			-h|--help)
+				cmd_help export
+				return
+				;;
 			--resend)
 				resend=RESEND
 				;;
@@ -989,9 +1034,25 @@ help_send()
 
 cmd_send()
 {
-	local auto_export=''
+	local args auto_export=''
 
-	[ "$#" != 0 ] ||
+	args=()
+
+	while [ "$#" != 0 ]; do
+		case "$1" in
+			-h|--help)
+				cmd_help send
+				return
+				;;
+			*)
+				args+=("$1")
+				;;
+		esac
+		shift
+	done
+	set -- "${args[@]}"
+
+	[ "$#" -gt 0 ] ||
 		auto_export=1
 
 	git --list-cmds=main |
@@ -1038,8 +1099,9 @@ help_archive()
 		options) builtin_cat <<-EOF
 
 			Options:
-			  -a, --add       Move all versions of patchset to archive.
-			  -r, --restore   Restore all versions of patchset.
+			  -a, --add       move all versions of patchset to archive.
+			  -r, --restore   restore all versions of patchset.
+			  -h, --help      show this text and exit.
 			EOF
 			;;
 	esac
@@ -1053,6 +1115,10 @@ cmd_archive()
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
+			-h|--help)
+				cmd_help archive
+				return
+				;;
 			-a|--add)
 				ver=v
 				;;
