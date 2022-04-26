@@ -232,11 +232,11 @@ cmd_create()
 			break
 		fi
 
-		workdir="$(git rev-parse --absolute-git-dir)/$PROG.temp"
+		workdir="$(git rev-parse --absolute-git-dir)/$PROGCMD-create"
 
 		if ! mkdir -- "$workdir"; then
 			workdir=''
-			exit 1
+			fatal "unable to create temporary directory: $workdir"
 		fi
 
 		b4 -q am -o "$workdir" -m "$mbox" ||
@@ -1034,7 +1034,7 @@ help_send()
 
 cmd_send()
 {
-	local args auto_export=''
+	local args auto_export='' patchset
 
 	args=()
 
@@ -1060,30 +1060,22 @@ cmd_send()
 		fatal "git-send-email(1) not found" ||:
 
 	if [ -n "$auto_export" ]; then
-		local dir patchset
 		current_patchset
 
-		dir="$(git rev-parse --absolute-git-dir; false)/$PROGCMD-send" ||
+		workdir="$(git rev-parse --absolute-git-dir)/$PROGCMD-send" ||
 			fatal "unable to find git directory"
-		set -- "$dir"
 
-		if ! mkdir -- "$1" >/dev/null 2>&1; then
-			[ -d "$1" ] ||
-				fatal "unable to create temporary directory: $1"
+		if ! mkdir -- "$workdir" >/dev/null 2>&1; then
+			[ -d "$workdir" ] ||
+				fatal "unable to create temporary directory: $workdir"
+			workdir=
 			fatal "another git-$PROGCMD-send(1) in progress"
 		fi
 
-		cmd_export "${patchset[$P_FULL]}" -o "$1" >/dev/null
+		cmd_export "${patchset[$P_FULL]}" -o "$workdir" >/dev/null
 	fi
 
-	local rc=0
-	git send-email --to=' ' --confirm=always --format-patch --suppress-from \
-		"$@" || rc=$?
-
-	[ -z "$auto_export" ] ||
-		rm -rf -- "$1" ||:
-
-	return $rc
+	git send-email --to=' ' --confirm=always --format-patch --suppress-from "$@"
 }
 
 help_archive()
