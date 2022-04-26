@@ -1,0 +1,11 @@
+### init
+### creating foo
+Switched to a new branch 'patchset/foo/v1.0'
+Branch 'patchset/foo/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/foo/v1.0
+### creating foo again
+fatal: A branch named 'patchset/foo/v1.0' already exists.
+git-patchset: unable to create new branch: patchset/foo/v1.0
+### list of branches
+  master
+* patchset/foo/v1.0

@@ -1,0 +1,34 @@
+### init
+### creating foo
+Switched to a new branch 'patchset/foo/v1.0'
+Branch 'patchset/foo/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/foo/v1.0
+### new minor version (1)
+Switched to branch 'patchset/foo/v1.1'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/foo/v1.1
+### new minor version (2)
+Switched to branch 'patchset/foo/v1.2'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/foo/v1.2
+### new major version (1)
+Switched to branch 'patchset/foo/v2.0'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/foo/v2.0
+### new major version (2)
+Switched to branch 'patchset/foo/v3.0'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/foo/v3.0
+### list of patchsets
+- aaaaaaa..bbbbbbb     (0) foo/v1.0
+- aaaaaaa..bbbbbbb     (0) foo/v1.1
+- aaaaaaa..bbbbbbb     (0) foo/v1.2
+- aaaaaaa..bbbbbbb     (0) foo/v2.0
+* aaaaaaa..bbbbbbb     (0) foo/v3.0
+### list of branches
+  master
+  patchset/foo/v1.0
+  patchset/foo/v1.1
+  patchset/foo/v1.2
+  patchset/foo/v2.0
+* patchset/foo/v3.0

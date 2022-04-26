@@ -1,0 +1,35 @@
+#!/bin/bash -efu
+
+cwd="$(readlink -ev "$0")"
+cwd="${cwd%/*}"
+bin="$cwd/.."
+
+workdir=
+exit_handler()
+{
+	trap - EXIT
+	[ -z "$workdir" ] ||
+		rm -rf -- "$workdir" ||:
+	exit "$1"
+}
+
+trap 'exit_handler $?' HUP PIPE INT QUIT TERM EXIT
+workdir=$(mktemp -d -t ts.XXXXXX)
+
+echo "### init"
+cd "$workdir"
+touch somefile
+
+git init --quiet -b master
+git add .
+git commit -q -a -m 'first commit'
+
+echo "### creating foo"
+"$bin"/git-patchset create --no-edit-cover foo
+
+echo "### list of patchsets"
+"$bin"/git-patchset list |
+	sed -r -e 's/ [0-9a-f]+\.\.[0-9a-f]+ / aaaaaaa..bbbbbbb /'
+
+echo "### list of branches"
+git branch

@@ -1,0 +1,17 @@
+### init
+### creating foo
+Switched to a new branch 'patchset/foo/v1.0'
+Branch 'patchset/foo/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/foo/v1.0
+### export 1
+patches/foo/v1-0001-Useful-change.patch
+### list of patches 1
+v1-0001-Useful-change.patch
+### export 2
+patches/foo/v1-0000-cover-letter.patch
+patches/foo/v1-0001-Useful-change.patch
+patches/foo/v1-0002-Another-useful-change.patch
+### list of patches 2
+v1-0000-cover-letter.patch
+v1-0001-Useful-change.patch
+v1-0002-Another-useful-change.patch

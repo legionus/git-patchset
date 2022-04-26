@@ -1,0 +1,121 @@
+### init
+### creating foo
+Switched to a new branch 'patchset/foo/v1.0'
+Branch 'patchset/foo/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/foo/v1.0
+### new minor version (1)
+Switched to branch 'patchset/foo/v1.1'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/foo/v1.1
+### new minor version (2)
+Switched to branch 'patchset/foo/v1.2'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/foo/v1.2
+### new major version (1)
+Switched to branch 'patchset/foo/v2.0'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/foo/v2.0
+### new major version (2)
+Switched to branch 'patchset/foo/v3.0'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/foo/v3.0
+### creating bar
+Switched to a new branch 'patchset/bar/v1.0'
+Branch 'patchset/bar/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/bar/v1.0
+### new minor version (1)
+Switched to branch 'patchset/bar/v1.1'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/bar/v1.1
+### new minor version (2)
+Switched to branch 'patchset/bar/v1.2'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/bar/v1.2
+### new major version (1)
+Switched to branch 'patchset/bar/v2.0'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/bar/v2.0
+### new major version (2)
+Switched to branch 'patchset/bar/v3.0'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/bar/v3.0
+### creating baz
+Switched to a new branch 'patchset/baz/v1.0'
+Branch 'patchset/baz/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/baz/v1.0
+### new minor version (1)
+Switched to branch 'patchset/baz/v1.1'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/baz/v1.1
+### new minor version (2)
+Switched to branch 'patchset/baz/v1.2'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/baz/v1.2
+### new major version (1)
+Switched to branch 'patchset/baz/v2.0'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/baz/v2.0
+### new major version (2)
+Switched to branch 'patchset/baz/v3.0'
+Your branch is up to date with 'master'.
+git-patchset: created a new version of patchset: patchset/baz/v3.0
+### archive foo
+git-patchset: WARNING: You have specified the version number but the entire patchset will be archived
+git-patchset: patchset/foo/v1.0 -> patchset/../a1.0
+git-patchset: patchset/foo/v1.1 -> patchset/../a1.1
+git-patchset: patchset/foo/v1.2 -> patchset/../a1.2
+git-patchset: patchset/foo/v2.0 -> patchset/../a2.0
+git-patchset: patchset/foo/v3.0 -> patchset/../a3.0
+### archive bar
+git-patchset: patchset/bar/v1.0 -> patchset/../a1.0
+git-patchset: patchset/bar/v1.1 -> patchset/../a1.1
+git-patchset: patchset/bar/v1.2 -> patchset/../a1.2
+git-patchset: patchset/bar/v2.0 -> patchset/../a2.0
+git-patchset: patchset/bar/v3.0 -> patchset/../a3.0
+### default list
+* aaaaaaa..bbbbbbb     (0) baz/v3.0
+### list of patchsets
+- aaaaaaa..bbbbbbb     (0) baz/v1.0
+- aaaaaaa..bbbbbbb     (0) baz/v1.1
+- aaaaaaa..bbbbbbb     (0) baz/v1.2
+- aaaaaaa..bbbbbbb     (0) baz/v2.0
+* aaaaaaa..bbbbbbb     (0) baz/v3.0
+### list of latest patchsets
+* aaaaaaa..bbbbbbb     (0) baz/v3.0
+### list of foo verions
+- aaaaaaa..bbbbbbb     (0) baz/v1.0
+- aaaaaaa..bbbbbbb     (0) baz/v1.1
+- aaaaaaa..bbbbbbb     (0) baz/v1.2
+- aaaaaaa..bbbbbbb     (0) baz/v2.0
+* aaaaaaa..bbbbbbb     (0) baz/v3.0
+### list of latest versions in archive
+- aaaaaaa..bbbbbbb     (0) bar/a3.0
+- aaaaaaa..bbbbbbb     (0) foo/a3.0
+### list of archive
+- aaaaaaa..bbbbbbb     (0) bar/a1.0
+- aaaaaaa..bbbbbbb     (0) bar/a1.1
+- aaaaaaa..bbbbbbb     (0) bar/a1.2
+- aaaaaaa..bbbbbbb     (0) bar/a2.0
+- aaaaaaa..bbbbbbb     (0) bar/a3.0
+- aaaaaaa..bbbbbbb     (0) foo/a1.0
+- aaaaaaa..bbbbbbb     (0) foo/a1.1
+- aaaaaaa..bbbbbbb     (0) foo/a1.2
+- aaaaaaa..bbbbbbb     (0) foo/a2.0
+- aaaaaaa..bbbbbbb     (0) foo/a3.0
+### list of branches
+  master
+  patchset/bar/a1.0
+  patchset/bar/a1.1
+  patchset/bar/a1.2
+  patchset/bar/a2.0
+  patchset/bar/a3.0
+  patchset/baz/v1.0
+  patchset/baz/v1.1
+  patchset/baz/v1.2
+  patchset/baz/v2.0
+* patchset/baz/v3.0
+  patchset/foo/a1.0
+  patchset/foo/a1.1
+  patchset/foo/a1.2
+  patchset/foo/a2.0
+  patchset/foo/a3.0

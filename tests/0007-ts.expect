@@ -1,0 +1,23 @@
+### init
+### creating foo
+Switched to a new branch 'patchset/foo/v1.0'
+Branch 'patchset/foo/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/foo/v1.0
+### export 1
+patches/foo/v1-0001-Useful-change.patch
+### list of patches 1
+v1-0001-Useful-change.patch
+### creating foo
+Switched to branch 'patchset/foo/v2.0'
+Your branch is ahead of 'master' by 1 commit.
+  (use "git push" to publish your local commits)
+git-patchset: created a new version of patchset: patchset/foo/v2.0
+### export 2
+patches/foo/v2-0000-cover-letter.patch
+patches/foo/v2-0001-Useful-change.patch
+patches/foo/v2-0002-Another-useful-change.patch
+### list of patches 2
+v1-0001-Useful-change.patch
+v2-0000-cover-letter.patch
+v2-0001-Useful-change.patch
+v2-0002-Another-useful-change.patch
