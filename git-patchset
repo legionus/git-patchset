@@ -61,20 +61,20 @@ signal_handler() { cleanup_handler  1; }
 parse_patchset()
 {
 	local __sref __name __vers
-	if [[ "$1" =~ ^(refs/)?(heads/)?(patchset/([^/]+)/[av]([0-9]+.[0-9]+)) ]]; then
+	if [[ "$1" =~ ^(refs/)?(heads/)?(patchset/([^/]+)(/[av]([0-9]+.[0-9]+))?) ]]; then
 		__sref="${BASH_REMATCH[3]}"
 		__name="${BASH_REMATCH[4]}"
-		__vers="${BASH_REMATCH[5]}"
-	elif [[ "$1" =~ ^(([^/]+)/[av]([0-9]+.[0-9]+)) ]]; then
+		__vers="${BASH_REMATCH[6]-}"
+	elif [[ "$1" =~ ^(([^/]+)(/[av]([0-9]+.[0-9]+))?) ]]; then
 		__sref="patchset/${BASH_REMATCH[1]}"
 		__name="${BASH_REMATCH[2]}"
-		__vers="${BASH_REMATCH[3]}"
+		__vers="${BASH_REMATCH[4]-}"
 	else
 		fatal "branch is not a patchset: $1"
 	fi
 
-	git rev-parse "$__sref" >/dev/null 2>&1 ||
-		fatal "unknown branch: $1"
+	[ -n "$(git for-each-ref --format=1 "refs/heads/patchset/$__name/[av]${__vers:-[0-9]*}")" ] ||
+		fatal "nothing matches the specified refspec: $1"
 
 	eval "$2=\"\$__sref\""
 	shift 2
@@ -87,7 +87,6 @@ parse_patchset()
 		eval "$1=\"\$__vers\""
 		shift
 	fi
-
 }
 
 current_patchset()
