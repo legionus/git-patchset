@@ -56,45 +56,32 @@ cleanup_handler()
 exit_handler()   { cleanup_handler $?; }
 signal_handler() { cleanup_handler  1; }
 
+readonly P_FULL=0 P_NAME=1 P_TYPE=2 P_VERS=3
+
 # in: refs/heads/patchset/sysctl-ipc/v1.0
-# out: "patchset/sysctl-ipc/v1.0" "sysctl-ipc" "1.0"
+# out: "patchset/sysctl-ipc/v1.0" "sysctl-ipc" "v" "1.0"
 parse_patchset()
 {
-	local __sref __name __vers
-	if [[ "$1" =~ ^(refs/)?(heads/)?(patchset/([^/]+)(/[av]([0-9]+.[0-9]+))?) ]]; then
-		__sref="${BASH_REMATCH[3]}"
-		__name="${BASH_REMATCH[4]}"
-		__vers="${BASH_REMATCH[6]-}"
-	elif [[ "$1" =~ ^(([^/]+)(/[av]([0-9]+.[0-9]+))?) ]]; then
-		__sref="patchset/${BASH_REMATCH[1]}"
-		__name="${BASH_REMATCH[2]}"
-		__vers="${BASH_REMATCH[4]-}"
+	if [[ "$1" =~ ^(refs/)?(heads/)?(patchset/([^/]+)(/([av])([0-9]+.[0-9]+))?) ]]; then
+		patchset=("${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" "${BASH_REMATCH[6]-}" "${BASH_REMATCH[7]-}")
+	elif [[ "$1" =~ ^(([^/]+)(/([av])([0-9]+.[0-9]+))?) ]]; then
+		patchset=("patchset/${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]-}" "${BASH_REMATCH[5]-}")
 	else
 		fatal "branch is not a patchset: $1"
 	fi
 
-	[ -n "$(git for-each-ref --format=1 "refs/heads/patchset/$__name/[av]${__vers:-[0-9]*}")" ] ||
+	local refspec="refs/heads/patchset/${patchset[$P_NAME]}/${patchset[$P_TYPE]-[av]}${patchset[$P_VERS]-[0-9]*}"
+
+	[ -n "$(git for-each-ref --format=1 "$refspec")" ] ||
 		fatal "nothing matches the specified refspec: $1"
-
-	eval "$2=\"\$__sref\""
-	shift 2
-
-	if [ "$#" -gt 0 ]; then
-		eval "$1=\"\$__name\""
-		shift
-	fi
-	if [ "$#" -gt 0 ]; then
-		eval "$1=\"\$__vers\""
-		shift
-	fi
 }
 
 current_patchset()
 {
-	local __v
-	__v="$(git branch --show-current --format='%(refname)')" ||
+	local ref
+	ref="$(git branch --show-current --format='%(refname)')" ||
 		fatal "unable to obtain current branch name"
-	parse_patchset "$__v" "$@"
+	parse_patchset "$ref"
 }
 
 builtin_cat()
@@ -404,8 +391,8 @@ help_config()
 
 cmd_config()
 {
-	local branchname='' name='' ver='' mode=edit
-	local to cc args cfg_prefix=''
+	local mode=edit
+	local to cc args patchset cfg_prefix=''
 
 	to=(); cc=(); args=();
 
@@ -437,19 +424,17 @@ cmd_config()
 	done
 	set -- "${args[@]}" "$@"
 
-	if [ "$#" != 0 ]; then
-		branchname="$1"
+	if [ "$#" -gt 0 ]; then
+		parse_patchset "$1"
 		shift
+	else
+		current_patchset
 	fi
 
-	[ "$#" = 0 ] ||
+	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
 
-	[ -n "$branchname" ] &&
-		parse_patchset "$branchname" branchname name ver ||
-		current_patchset branchname name ver
-
-	[ -n "$name" ] && [ -n "$ver" ] ||
+	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
 
 	if [ -n "$cfg_prefix" ]; then
@@ -467,10 +452,10 @@ cmd_config()
 		)
 		if [ -z "$cfg_prefix" ]; then
 			readarray -O "${#arr[@]}" -t arr <<< $(
-				git config --get-all branch.$branchname.to ||:;
-				git config --get-all branch.$branchname.cc ||:;
+				git config --get-all branch.${patchset[$P_FULL]}.to ||:;
+				git config --get-all branch.${patchset[$P_FULL]}.cc ||:;
 			)
-			cfg_prefix="branch.$branchname"
+			cfg_prefix="branch.${patchset[$P_FULL]}"
 		fi
 
 		add_recipient()
@@ -503,7 +488,7 @@ cmd_config()
 			builtin_cat > "$git_dir/config.patchset.ini" <<EOF
 [patchset]
 
-[branch "$branchname"]
+[branch "${patchset[$P_FULL]}"]
 #
 # Available fields:
 #
@@ -519,7 +504,7 @@ cmd_config()
 #
 EOF
 			(
-				fetch_config_section "$branchname" \
+				fetch_config_section "${patchset[$P_FULL]}" \
 					"$git_dir/config" \
 					"$git_dir/config.patchset.ini"
 
@@ -527,7 +512,7 @@ EOF
 					--file "$git_dir/config.patchset.ini" \
 					--edit
 
-				fetch_config_section "$branchname" \
+				fetch_config_section "${patchset[$P_FULL]}" \
 					"$git_dir/config.patchset.ini" \
 					"$git_dir/config"
 			) || rc=$?
@@ -570,7 +555,7 @@ help_list()
 
 cmd_list()
 {
-	local mode='' ver=v show_current=''
+	local mode='' ver=v show_current='' patchset
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -602,33 +587,27 @@ cmd_list()
 		ColorReset="$(  git config --get-color "" "reset")"
 	fi
 
-	local curbranch='' curname=''
-
 	case "$mode" in
 		versions)
-			if [ "$#" != 0 ]; then
-				name="$1"
+			if [ "$#" -gt 0 ]; then
+				parse_patchset "$1"
 				shift
+			else
+				current_patchset
 			fi
-
-			[ -n "${name-}" ] &&
-				parse_patchset "$name" curbranch curname ||
-				current_patchset curbranch curname
 			;;
 		*)
+			patchset[$P_NAME]='*'
 			;;
 	esac
 
-	[ "$#" = 0 ] ||
+	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
-
-	[ "$mode" = 'versions' ] ||
-		curname='*'
 
 	{
 		git for-each-ref \
 			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=3)' \
-			"refs/heads/patchset/$curname/$ver[0-9]*" |
+			"refs/heads/patchset/${patchset[$P_NAME]}/$ver[0-9]*" |
 			sort -V -t\  -k3,3
 		printf '\n'
 	} |
@@ -640,7 +619,7 @@ cmd_list()
 				all|versions)
 					;;
 				latest)
-					if [ -n "$show_current" ] && [ "$branchname" = "$curbranch" ]; then
+					if [ -n "$show_current" ] && [ "$branchname" = "${patchset[$P_FULL]-}" ]; then
 						:;
 					elif [ "${prev_patchset:-$on_patchset}" = "$on_patchset" ]; then
 						break
@@ -693,7 +672,7 @@ help_version()
 
 cmd_version()
 {
-	local newname='' newver='' branchname='' name='' ver='' inc=''
+	local newname='' newver='' branchname='' inc=''
 
 	while [ "$#" != 0 ]; do
 		case "$1" in
@@ -714,25 +693,23 @@ cmd_version()
 		shift
 	done
 
-	if [ "$#" != 0 ]; then
-		branchname="$1"
+	if [ "$#" -gt 0 ]; then
+		parse_patchset "$1"
 		shift
+	else
+		current_patchset
 	fi
 
-	if [ "$#" != 0 ]; then
+	if [ "$#" -gt 0 ]; then
 		newver="${1#[av]}"
 		shift
 	fi
 
-	[ "$#" = 0 ] ||
+	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
 
-	[ -n "$branchname" ] &&
-		parse_patchset "$branchname" branchname name ver ||
-		current_patchset branchname name ver
-
 	if [ -z "$newver" ]; then
-		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/$name/" |
+		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/${patchset[$P_NAME]}/" |
 			sed -e 's/^.*\/[av]//' |
 			sort --version-sort |
 			tail -1)"
@@ -751,13 +728,13 @@ cmd_version()
 		fi
 	fi
 
-	newname="patchset/$name/v$newver"
+	newname="patchset/${patchset[$P_NAME]}/v$newver"
 
 	! git rev-parse "$newname" >/dev/null 2>&1 ||
 		fatal "$newname: branch already exists"
 
-	git branch -c "$branchname" "$newname" ||
-		fatal "unable to copy '$branchname' branch"
+	git branch -c "${patchset[$P_FULL]}" "$newname" ||
+		fatal "unable to copy '${patchset[$P_FULL]}' branch"
 
 	git switch "$newname" ||
 		fatal "unable to switch to '$newname'"
@@ -787,8 +764,8 @@ help_cover()
 
 cmd_cover()
 {
-	local branchname='' name='' ver='' mode=list use_pager=1 pager=''
-	local to cc args
+	local mode=list use_pager=1 pager=''
+	local to cc args patchset
 
 	to=(); cc=(); args=();
 
@@ -812,31 +789,29 @@ cmd_cover()
 	done
 	set -- "${args[@]}" "$@"
 
-	if [ "$#" != 0 ]; then
-		branchname="$1"
+	if [ "$#" -gt 0 ]; then
+		parse_patchset "$1"
 		shift
+	else
+		current_patchset
 	fi
 
-	[ "$#" = 0 ] ||
+	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
 
-	[ -n "$branchname" ] &&
-		parse_patchset "$branchname" branchname name ver ||
-		current_patchset branchname name ver
-
-	[ -n "$name" ] && [ -n "$ver" ] ||
+	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
 
 	case "$mode" in
 		edit)
-			git branch --edit-description "$branchname"
+			git branch --edit-description "${patchset[$P_FULL]}"
 			;;
 		list)
 			if [ -n "$use_pager" ] && [ -t 1 ]; then
 				get_pager pager
-				describe_patchset "$branchname" |$pager
+				describe_patchset "${patchset[$P_FULL]}" |$pager
 			else
-				describe_patchset "$branchname"
+				describe_patchset "${patchset[$P_FULL]}"
 			fi
 			;;
 	esac
@@ -860,21 +835,19 @@ help_log()
 
 cmd_log()
 {
-	local branchname=''
+	local basecommit patchset
 
-	if [ "$#" != 0 ]; then
-		branchname="$1"
+	if [ "$#" -gt 0 ]; then
+		parse_patchset "$1"
 		shift
+	else
+		current_patchset
 	fi
 
-	[ -n "$branchname" ] &&
-		parse_patchset "$branchname" branchname ||
-		current_patchset branchname
-
-	basecommit="$(basecommit_for "$branchname")" ||
+	basecommit="$(basecommit_for "${patchset[$P_FULL]}")" ||
 		return 1
 
-	git log "$@" "$basecommit..$branchname"
+	git log "$@" "$basecommit..${patchset[$P_FULL]}"
 }
 
 help_export()
@@ -901,7 +874,7 @@ help_export()
 
 cmd_export()
 {
-	local subject_prefix='' branchname='' basecommit name ver arr args
+	local subject_prefix='' basecommit arr args patchset
 	local resend='' rfc='' outdir=''
 
 	args=()
@@ -938,21 +911,19 @@ cmd_export()
 	set -- "${args[@]}" "$@"
 
 	if [ "$#" != 0 ]; then
-		branchname="$1"
+		parse_patchset "$1"
 		shift
+	else
+		current_patchset
 	fi
 
-	[ -n "$branchname" ] &&
-		parse_patchset "$branchname" branchname name ver ||
-		current_patchset branchname name ver
-
-	[ -n "$name" ] && [ -n "$ver" ] ||
+	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
 
 	arr=()
 	readarray -t arr <<< $(
 		git config --get-all patchset.to ||:;
-		git config --get-all branch.$branchname.to ||:;
+		git config --get-all branch.${patchset[$P_FULL]}.to ||:;
 	)
 	for n in "${arr[@]}"; do
 		[ -z "$n" ] ||
@@ -962,7 +933,7 @@ cmd_export()
 	arr=()
 	readarray -t arr <<< $(
 		git config --get-all patchset.cc ||:;
-		git config --get-all branch.$branchname.cc ||:;
+		git config --get-all branch.${patchset[$P_FULL]}.cc ||:;
 	)
 	for n in "${arr[@]}"; do
 		[ -z "$n" ] ||
@@ -972,7 +943,7 @@ cmd_export()
 	arr=()
 	readarray -t arr <<< $(
 		echo $resend $rfc;
-		git config --get branch.$branchname.subject-prefix ||:;
+		git config --get branch.${patchset[$P_FULL]}.subject-prefix ||:;
 		echo PATCH;
 	)
 	for n in "${arr[@]}"; do
@@ -982,22 +953,22 @@ cmd_export()
 
 	set -- "$@" "--subject-prefix=$subject_prefix"
 
-	basecommit="$(basecommit_for "$branchname")" ||
+	basecommit="$(basecommit_for "${patchset[$P_FULL]}")" ||
 		return 1
 
-	if [ -z "${ver##*[!0-9]*}" ]; then
+	if [ -z "${patchset[$P_VERS]##*[!0-9]*}" ]; then
 		# git-format-patch: switch `v' expects a numerical value
-		ver="${ver%%[!0-9]*}"
+		ver="${patchset[$P_VERS]%%[!0-9]*}"
 	fi
 
-	outdir="${outdir:-patches/$name/}"
+	outdir="${outdir:-patches/${patchset[$P_NAME]}/}"
 
 	[ -d "$outdir" ] ||
 		mkdir -p -- "$outdir"
 
 	git format-patch -v "$ver" --thread --minimal --cover-from-description=auto \
 		-o "$outdir" \
-		"$@" "$basecommit..$branchname"
+		"$@" "$basecommit..${patchset[$P_FULL]}"
 }
 
 help_send()
@@ -1076,7 +1047,7 @@ help_archive()
 
 cmd_archive()
 {
-	local ver=v new='' branchname='' args
+	local ver=v new='' args
 
 	args=()
 
@@ -1105,37 +1076,35 @@ cmd_archive()
 		v) new=a ;;
 	esac
 
-	if [ "$#" != 0 ]; then
-		branchname="$1"
+	if [ "$#" -gt 0 ]; then
+		parse_patchset "$1"
 		shift
+	else
+		current_patchset
 	fi
 
-	[ "$#" = 0 ] ||
+	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
 
-	[ -n "$branchname" ] &&
-		parse_patchset "$branchname" branchname bname bver ||
-		current_patchset branchname bname bver
-
-	[ -z "$bver" ] ||
+	[ -z "${patchset[$P_VERS]}" ] ||
 		message "WARNING: You have specified the version number but the entire patchset will be archived"
 
 	git for-each-ref --format='%(refname:lstrip=2)' \
-		"refs/heads/patchset/$bname/$ver[0-9]*" |
+		"refs/heads/patchset/${patchset[$P_NAME]}/$ver[0-9]*" |
 	while :; do
 		read -r name ||:
 
 		if [ -z "$name" ]; then
 			[ -n "${found-}" ] ||
-				message "patchset/$bname: patchset not found."
+				message "patchset/${patchset[$P_NAME]}: patchset not found."
 			break
 		fi
 
-		parse_patchset "$name" _ _ num
+		num="${name##*/[av]}"
 
-		git branch -M "$name" "patchset/$bname/$new$num"
+		git branch -M "$name" "patchset/${patchset[$P_NAME]}/$new$num"
 
-		message "patchset/$bname/$ver$num -> patchset/../$new$num"
+		message "patchset/${patchset[$P_NAME]}/$ver$num -> patchset/../$new$num"
 		found=1
 	done
 }
