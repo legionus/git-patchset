@@ -669,10 +669,10 @@ cmd_list()
 	done
 }
 
-help_new()
+help_version()
 {
 	case "$1" in
-		usage) printf 'new [--major|--minor] [<patchset>] [number]\n'
+		usage) printf 'version [--major|--minor] [<patchset>] [number]\n'
 			;;
 		descr) builtin_cat <<-EOF
 			Creates branch for a new version of <patchset>. Branch will
@@ -689,7 +689,7 @@ help_new()
 	esac
 }
 
-cmd_new()
+cmd_version()
 {
 	local newname='' newver='' branchname='' name='' ver='' inc=''
 
@@ -762,7 +762,7 @@ cmd_new()
 	git switch "$newname" ||
 		fatal "unable to switch to '$newname'"
 
-	message "new patchset version created: $newname"
+	message "created a new version of patchset: $newname"
 }
 
 help_cover()
@@ -1238,7 +1238,8 @@ case "$cmd" in
 	cr|create)	cmd_create	"$@"	;;
 	ex|export)	cmd_export	"$@"	;;
 	ls|list)	cmd_list	"$@"	;;
-	config|cover|new|log|send|archive)
+	vr|version)	cmd_version	"$@"	;;
+	config|cover|log|send|archive)
 			cmd_"$cmd"	"$@"	;;
 	*)
 		fatal "unknown command: $cmd"
