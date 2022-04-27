@@ -1020,7 +1020,7 @@ help_send()
 
 cmd_send()
 {
-	local args auto_export='' patchset
+	local args patchset
 
 	args=()
 
@@ -1038,14 +1038,11 @@ cmd_send()
 	done
 	set -- "${args[@]}"
 
-	[ "$#" -gt 0 ] ||
-		auto_export=1
-
 	git --list-cmds=main |
 		while read -r n; do [ "$n" != 'send-email' ] || exit 1; done &&
 		fatal "git-send-email(1) not found" ||:
 
-	if [ -n "$auto_export" ]; then
+	if [ "$#" -eq 0 ]; then
 		current_patchset
 
 		workdir="$(git rev-parse --absolute-git-dir)/$PROGCMD-send" ||
