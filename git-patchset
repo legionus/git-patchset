@@ -607,7 +607,7 @@ cmd_list()
 
 	{
 		git for-each-ref \
-			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=3)' \
+			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
 			"refs/heads/patchset/${patchset[$P_NAME]}/$ver[0-9]*" |
 			sort -V -t\  -k3,3
 		printf '\n'
@@ -628,7 +628,7 @@ cmd_list()
 					;;
 			esac
 
-			basecommit="$(basecommit_for "patchset/$branchname")" ||
+			basecommit="$(basecommit_for "$branchname")" ||
 				break
 
 			[ "$mark" = '*' ] &&
