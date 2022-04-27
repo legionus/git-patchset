@@ -30,20 +30,6 @@ quote_regexp()
 	printf '%s' "$out"
 }
 
-startup_working_directory=''
-chdir_to_toplevel()
-{
-	local cdup
-	cdup="$(git rev-parse --show-cdup)"
-	if [ -z "$cdup" ]; then
-		startup_working_directory=''
-	else
-		startup_working_directory="$PWD"
-		cd "$cdup" ||
-			fatal "Cannot chdir to $cdup, the toplevel of the working tree"
-	fi
-}
-
 workdir=
 cleanup_handler()
 {
@@ -1249,8 +1235,6 @@ cmd_help()
 
 	EOF
 }
-
-chdir_to_toplevel
 
 [ "$#" != 0 ] || set -- list --latest --current
 cmd="$1"; shift
