@@ -863,7 +863,7 @@ cmd_log()
 	done
 	set -- "${args[@]}"
 
-	if [ "$#" -gt 0 ]; then
+	if [ "$#" -gt 0 ] && [ -n "${1##-*}" ]; then
 		parse_patchset "$1"
 		shift
 	else
@@ -873,7 +873,7 @@ cmd_log()
 	basecommit="$(basecommit_for "${patchset[$P_FULL]}")" ||
 		return 1
 
-	git log "$@" "$basecommit..${patchset[$P_FULL]}"
+	git log "$basecommit..${patchset[$P_FULL]}" "$@"
 }
 
 help_export()
@@ -941,7 +941,7 @@ cmd_export()
 	done
 	set -- "${args[@]}" "$@"
 
-	if [ "$#" != 0 ]; then
+	if [ "$#" != 0 ] && [ -n "${1##-*}" ]; then
 		parse_patchset "$1"
 		shift
 	else
