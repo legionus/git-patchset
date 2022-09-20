@@ -270,7 +270,7 @@ $(<"$fn.msg")
 
 describe_patchset()
 {
-	local branchname basecommit subject_prefix ver
+	local branchname basecommit subject_prefix ver recipients
 
 	branchname="$1"; shift
 	basecommit="$(basecommit_for "$branchname")" ||
@@ -282,9 +282,11 @@ describe_patchset()
 	ver="${branchname##*/[av]}"
 	ver="${ver%%.*}"
 
+	recipients=()
+
 	show_field_list()
 	{
-		local arr i n="$1"
+		local arr i a n="$1"
 
 		readarray -t arr <<< $(
 			git config --get-all patchset.$2 ||:;
@@ -294,6 +296,11 @@ describe_patchset()
 		for i in "${!arr[@]}"; do
 			[ -n "${arr[$i]}" ] ||
 				continue
+			for a in "${recipients[@]}"; do
+				[ "${arr[$i]}" != "$a" ] ||
+					continue 2
+			done
+			recipients+=("${arr[$i]}")
 			printf "%-${#1}s %s" "$n" "${arr[$i]}"
 			[ "$i" = "$(( ${#arr[@]} - 1 ))" ] ||
 				printf ','
@@ -901,7 +908,7 @@ help_export()
 
 cmd_export()
 {
-	local subject_prefix='' basecommit arr args patchset
+	local subject_prefix='' basecommit arg rec args patchset recipients
 	local resend='' rfc='' outdir=''
 
 	args=()
@@ -951,36 +958,34 @@ cmd_export()
 	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
 
-	arr=()
-	readarray -t arr <<< $(
-		git config --get-all patchset.to ||:;
-		git config --get-all branch.${patchset[$P_FULL]}.to ||:;
-	)
-	for n in "${arr[@]}"; do
-		[ -z "$n" ] ||
-			set -- "$@" "--to=$n"
+	recipients=()
+
+	for arg in to cc; do
+		while read -r n; do
+			[ -n "$n" ] ||
+				continue
+			for rec in "${recipients[@]}"; do
+				[ "$n" != "$rec" ] ||
+					continue 2
+			done
+
+			set -- "$@" "--$arg=$n"
+
+			recipients+=("$n")
+		done <<< $(
+			git config --get-all patchset.$arg ||:;
+			git config --get-all branch.${patchset[$P_FULL]}.$arg ||:;
+		)
 	done
 
-	arr=()
-	readarray -t arr <<< $(
-		git config --get-all patchset.cc ||:;
-		git config --get-all branch.${patchset[$P_FULL]}.cc ||:;
-	)
-	for n in "${arr[@]}"; do
+	while read -r n; do
 		[ -z "$n" ] ||
-			set -- "$@" "--cc=$n"
-	done
-
-	arr=()
-	readarray -t arr <<< $(
+			subject_prefix="${subject_prefix:+$subject_prefix }$n"
+	done <<< $(
 		echo $resend $rfc;
 		git config --get branch.${patchset[$P_FULL]}.subject-prefix ||:;
 		echo PATCH;
 	)
-	for n in "${arr[@]}"; do
-		[ -z "$n" ] ||
-			subject_prefix="${subject_prefix:+$subject_prefix }$n"
-	done
 
 	set -- "$@" "--subject-prefix=$subject_prefix"
 
