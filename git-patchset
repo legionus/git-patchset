@@ -129,6 +129,11 @@ basecommit_for()
 		name="${1#refs/}"
 		name="${name#heads/}"
 
+		if merge="$(git rev-parse --short "refs/tags/$name" 2>/dev/null)"; then
+			__basecommit_for="$merge"
+			return
+		fi
+
 		if ! merge="$(git config "branch.$name.merge")"; then
 			message "not found upstream for branch: $name"
 			message "Use \`git branch -u <upstream> $name\` to set upstream for branch."
@@ -291,9 +296,12 @@ $(<"$fn.msg")
 	git config "branch.patchset/$branchname/$newver.description" "$cover" ||
 		fatal "unable to write empty description for patchset/$branchname/$newver"
 
-	[ -n "$mbox" ] || [ -n "$no_edit_cover" ] ||
+	if [ -z "$mbox" ] && [ -z "$no_edit_cover" ]; then
 		git branch --edit-description "patchset/$branchname/$newver" ||
 			fatal "unable to change description"
+		cover="$(git config "branch.patchset/$branchname/$newver.description")"
+	fi
+	git tag --annotate --file=- "patchset/$branchname/$newver" <<<"$cover"
 
 	message "new patchset created: patchset/$branchname/$newver"
 }
@@ -782,7 +790,7 @@ help_cover()
 cmd_cover()
 {
 	local mode=list use_pager=1 pager=''
-	local to cc args patchset
+	local to cc args patchset commit
 
 	to=(); cc=(); args=();
 
@@ -818,6 +826,13 @@ cmd_cover()
 	case "$mode" in
 		edit)
 			git branch --edit-description "${patchset[$P_FULL]}"
+
+			commit="$(git config "branch.${patchset[$P_FULL]}.merge")"
+			commit="$(git rev-parse --verify "$commit")"
+
+			git config "branch.${patchset[$P_FULL]}.description" |
+				git tag --annotate --file=- --force \
+					"${patchset[$P_FULL]}" "$commit"
 			;;
 		list)
 			if [ -n "$use_pager" ] && [ -t 1 ]; then
