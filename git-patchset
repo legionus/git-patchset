@@ -90,32 +90,41 @@ get_pager()
 
 basecommit_for()
 {
-	local merge remote
-	if ! merge="$(git config "branch.$1.merge")"; then
-		message "not found upstream for branch: $1"
-		message "Use \`git branch -u <upstream> $1\` to set upstream for branch."
-		return 1
-	fi
+	local __basecommit_for=''
+	__basecommit_for()
+	{
+		local merge remote
 
-	if ! remote="$(git config "branch.$1.remote")"; then
-		message "unable to find \"branch.$1.remote\"."
-		return 1
-	fi
+		if ! merge="$(git config "branch.$1.merge")"; then
+			message "not found upstream for branch: $1"
+			message "Use \`git branch -u <upstream> $1\` to set upstream for branch."
+			return 1
+		fi
 
-	case "$remote" in
-		'.')
-			;;
-		*)
-			merge="${merge#refs/}"
-			merge="${merge#heads/}"
-			merge="refs/remotes/$remote/$merge"
-			;;
-	esac
+		if ! remote="$(git config "branch.$1.remote")"; then
+			message "unable to find \"branch.$1.remote\"."
+			return 1
+		fi
 
-	git rev-parse --short "$merge" || {
-		message "unable to resolve reference: $merge"
-		return 1
+		case "$remote" in
+			'.')
+				;;
+			*)
+				merge="${merge#refs/}"
+				merge="${merge#heads/}"
+				merge="refs/remotes/$remote/$merge"
+				;;
+		esac
+
+		__basecommit_for="$(git rev-parse --short "$merge")" || {
+			message "unable to resolve reference: $merge"
+			return 1
+		}
 	}
+
+	__basecommit_for "$2" ||
+		return
+	eval "$1=\"\$__basecommit_for\""
 }
 
 help_create()
@@ -273,7 +282,7 @@ describe_patchset()
 	local branchname basecommit subject_prefix ver recipients
 
 	branchname="$1"; shift
-	basecommit="$(basecommit_for "$branchname")" ||
+	basecommit_for basecommit "$branchname" ||
 		return 1
 
 	subject_prefix="$(git config --get branch.$branchname.subject-prefix)" ||:
@@ -635,7 +644,7 @@ cmd_list()
 					;;
 			esac
 
-			basecommit="$(basecommit_for "$branchname")" ||
+			basecommit_for basecommit "$branchname" ||
 				break
 
 			[ "$mark" = '*' ] &&
@@ -877,7 +886,7 @@ cmd_log()
 		current_patchset
 	fi
 
-	basecommit="$(basecommit_for "${patchset[$P_FULL]}")" ||
+	basecommit_for basecommit "${patchset[$P_FULL]}" ||
 		return 1
 
 	git log "$basecommit..${patchset[$P_FULL]}" "$@"
@@ -989,7 +998,7 @@ cmd_export()
 
 	set -- "$@" "--subject-prefix=$subject_prefix"
 
-	basecommit="$(basecommit_for "${patchset[$P_FULL]}")" ||
+	basecommit_for basecommit "${patchset[$P_FULL]}" ||
 		return 1
 
 	if [ -z "${patchset[$P_VERS]##*[!0-9]*}" ]; then
