@@ -161,7 +161,7 @@ basecommit_for()
 help_create()
 {
 	case "$1" in
-		usage) printf 'create <newname> [options]\n'
+		usage) printf 'create [options] <newname> [<start-point>]\n'
 			;;
 		descr) builtin_cat <<-EOF
 			Creates branch for a new patchset. The new branch will be
