@@ -71,10 +71,10 @@ option_s()
 	return 1
 }
 
-readonly P_FULL=0 P_NAME=1 P_TYPE=2 P_VERS=3
+readonly P_HEAD=0 P_FULL=1 P_NAME=2 P_TYPE=3 P_VERS=4
 
 # in: refs/heads/patchset/sysctl-ipc/v1.0
-# out: "patchset/sysctl-ipc/v1.0" "sysctl-ipc" "v" "1.0"
+# out: "refs/heads/patchset/sysctl-ipc/v1.0" "patchset/sysctl-ipc/v1.0" "sysctl-ipc" "v" "1.0"
 parse_refname()
 {
 	local __parse_refname
@@ -82,7 +82,7 @@ parse_refname()
 	if [ "$#" -eq 1 ] || [ -z "${2-}" ]; then
 		__parse_refname="$(git branch --show-current --format='%(refname)')" ||
 			fatal "unable to obtain current branch name"
-		set -- "$1" "$__parse_refname"
+		set -- "$1" "refs/heads/$__parse_refname"
 	fi
 
 	declare -n "__parse_refname=$1"
@@ -98,7 +98,7 @@ parse_refname()
 	[ -n "$(git for-each-ref --format=1 "refs/heads/patchset/${3}/${4-[av]}${5-[0-9]*}")" ] ||
 		fatal "nothing matches the specified refspec: $1"
 
-	__parse_refname=( [$P_FULL]="$2" [$P_NAME]="$3" [$P_TYPE]="$4" [$P_VERS]="$5" )
+	__parse_refname=( [$P_HEAD]="refs/heads/$2" [$P_FULL]="$2" [$P_NAME]="$3" [$P_TYPE]="$4" [$P_VERS]="$5" )
 }
 
 builtin_cat()
@@ -124,16 +124,19 @@ basecommit_for()
 	local __basecommit_for=''
 	__basecommit_for()
 	{
-		local merge remote
+		local name merge remote
 
-		if ! merge="$(git config "branch.$1.merge")"; then
-			message "not found upstream for branch: $1"
-			message "Use \`git branch -u <upstream> $1\` to set upstream for branch."
+		name="${1#refs/}"
+		name="${name#heads/}"
+
+		if ! merge="$(git config "branch.$name.merge")"; then
+			message "not found upstream for branch: $name"
+			message "Use \`git branch -u <upstream> $name\` to set upstream for branch."
 			return 1
 		fi
 
-		if ! remote="$(git config "branch.$1.remote")"; then
-			message "unable to find \"branch.$1.remote\"."
+		if ! remote="$(git config "branch.$name.remote")"; then
+			message "unable to find \"branch.$name.remote\"."
 			return 1
 		fi
 
@@ -344,10 +347,10 @@ describe_patchset()
 	printf 'Subject: [%s v%s 0/%s] %s\n\n' \
 		"$subject_prefix" \
 		"$ver" \
-		"$(git rev-list --count "$basecommit..$branchname")" \
+		"$(git rev-list --count "$basecommit..refs/heads/$branchname")" \
 		"$(git config "branch.$branchname.description")"
 	git rev-list --date-order --reverse --abbrev-commit --format=oneline \
-		"$basecommit..$branchname"
+		"$basecommit..refs/heads/$branchname"
 }
 
 fetch_config_section()
@@ -747,7 +750,7 @@ cmd_version()
 		fatal "$newname: branch already exists"
 
 	git branch -c "${patchset[$P_FULL]}" "$newname" ||
-		fatal "unable to copy '${patchset[$P_FULL]}' branch"
+		fatal "unable to copy 'patchset/${patchset[$P_NAME]}' branch"
 
 	git switch "$newname" ||
 		fatal "unable to switch to '$newname'"
@@ -871,10 +874,10 @@ cmd_log()
 		parse_refname patchset
 	fi
 
-	basecommit_for basecommit "${patchset[$P_FULL]}" ||
+	basecommit_for basecommit "${patchset[$P_HEAD]}" ||
 		return 1
 
-	git log "$basecommit..${patchset[$P_FULL]}" "$@"
+	git log "$basecommit..${patchset[$P_HEAD]}" "$@"
 }
 
 help_export()
@@ -970,7 +973,7 @@ cmd_export()
 
 	set -- "$@" "--subject-prefix=$subject_prefix"
 
-	basecommit_for basecommit "${patchset[$P_FULL]}" ||
+	basecommit_for basecommit "${patchset[$P_HEAD]}" ||
 		return 1
 
 	if [ -z "${patchset[$P_VERS]##*[!0-9]*}" ]; then
@@ -985,7 +988,7 @@ cmd_export()
 
 	git format-patch -v "$ver" --thread --minimal --cover-from-description=auto \
 		-o "$outdir" \
-		"$@" "$basecommit..${patchset[$P_FULL]}"
+		"$@" "$basecommit..${patchset[$P_HEAD]}"
 }
 
 help_send()
