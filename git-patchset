@@ -308,7 +308,7 @@ $(<"$fn.msg")
 
 describe_patchset()
 {
-	local branchname basecommit subject_prefix ver recipients
+	local branchname basecommit subject_prefix ver recipients range
 
 	branchname="$1"; shift
 	basecommit_for basecommit "$branchname" ||
@@ -347,18 +347,16 @@ describe_patchset()
 		done
 	}
 
-	printf 'From %s %s\n' \
-		"$(git config --get user.email)" \
-		"$(LANG=C date -u)" ||:
+	range="$basecommit..refs/heads/$branchname"
+
+	printf -- 'From %s %s\n' "$(git config --get user.email)" "$(LANG=C date -u)" ||:
 	show_field_list To: to
 	show_field_list Cc: cc
-	printf 'Subject: [%s v%s 0/%s] %s\n\n' \
-		"$subject_prefix" \
-		"$ver" \
-		"$(git rev-list --count "$basecommit..refs/heads/$branchname")" \
-		"$(git config "branch.$branchname.description")"
-	git rev-list --date-order --reverse --abbrev-commit --format=oneline \
-		"$basecommit..refs/heads/$branchname"
+	printf -- 'Subject: [%s v%s 0/%s] ' "$subject_prefix" "$ver" "$(git rev-list --count "$range")"
+	git config "branch.$branchname.description" |
+		sed -n -e '1,/^--$/ { /^--$/d; p }'
+	printf -- '--\n\n'
+	git rev-list --date-order --reverse --abbrev-commit --format=oneline "$range"
 }
 
 fetch_config_section()
