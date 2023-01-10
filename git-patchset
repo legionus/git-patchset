@@ -42,6 +42,35 @@ cleanup_handler()
 exit_handler()   { cleanup_handler $?; }
 signal_handler() { cleanup_handler  1; }
 
+option_b()
+{
+	for OPTNAME in $1; do
+		if [ -z "${2##$OPTNAME}" ]; then
+			OPTSHIFT=1
+			return 0
+		fi
+	done
+	return 1
+}
+
+option_s()
+{
+	for OPTNAME in $1; do
+		if [ -z "${2##$OPTNAME}" ]; then
+			[ "$#" -gt 2 ] ||
+				fatal "argument required for $2 option"
+			OPTVALUE="$3"
+			OPTSHIFT=2
+		elif [ -z "${2##$OPTNAME=*}" ]; then
+			OPTVALUE="${2#$OPTNAME=}"
+			OPTSHIFT=1
+		fi
+		[ -z "${OPTSHIFT-}" ] ||
+			return 0
+	done
+	return 1
+}
+
 readonly P_FULL=0 P_NAME=1 P_TYPE=2 P_VERS=3
 
 # in: refs/heads/patchset/sysctl-ipc/v1.0
@@ -160,37 +189,24 @@ cmd_create()
 
 	args=()
 	while [ "$#" -gt 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help create
-				return
-				;;
-			--no-edit-cover)
-				no_edit_cover=1
-				;;
-			-S|--start-point)
-				[ "$#" -gt 1 ] ||
-					fatal "argument required for $1 option"
-				startpoint="$2"
-				shift
-				;;
-			--start-point=*)
-				startpoint="${1#--start-point=}"
-				;;
-			-m|--use-local-mbox)
-				[ "$#" -gt 1 ] ||
-					fatal "argument required for $1 option"
-				mbox="$2"
-				shift
-				;;
-			--use-local-mbox=*)
-				mbox="${1#--use-local-mbox=}"
-				;;
-			*)
-				args+=("$1")
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help create
+			return
+		elif option_b '--no-edit-cover' "$@"; then
+			no_edit_cover=1
+		elif option_s '-S --start-point' "$@"; then
+			startpoint="$OPTVALUE"
+		elif option_s '-m --use-local-mbox' "$@"; then
+			mbox="$OPTVALUE"
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
 	done
 	set -- "${args[@]}"
 
@@ -407,34 +423,28 @@ cmd_config()
 	to=(); cc=(); args=();
 
 	while [ "$#" != 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help config
-				return
-				;;
-			-e|--edit)
-				mode=edit
-				;;
-			--global)
-				cfg_prefix="patchset"
-				;;
-			--to=*)
-				to+=("${1#--to=}")
-				mode=tocc
-				;;
-			--cc=*)
-				cc+=("${1#--cc=}")
-				mode=tocc
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-				args+=("$1")
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help config
+			return
+		elif option_b '-e --edit' "$@"; then
+			mode=edit
+		elif option_b '--global' "$@"; then
+			cfg_prefix="patchset"
+		elif option_s '--to' "$@"; then
+			to+=("$OPTVALUE")
+			mode=tocc
+		elif option_s '--cc' "$@"; then
+			cc+=("$OPTVALUE")
+			mode=tocc
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
 	done
 	set -- "${args[@]}" "$@"
 
@@ -569,26 +579,24 @@ cmd_list()
 	local mode='' ver=v show_current='' patchset
 
 	while [ "$#" != 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help list
-				return
-				;;
-			--all|--latest|--versions)
-				mode="${1#--}"
-				;;
-			--archive)
-				mode="${mode:-latest}"
-				ver=a
-				;;
-			--current)
-				show_current=1
-				;;
-			*)
-				break
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help list
+			return
+		elif option_b '--all --latest --versions' "$@"; then
+			mode="${OPTNAME#--}"
+		elif option_b '--archive' "$@"; then
+			mode="${mode:-latest}"
+			ver=a
+		elif option_b '--current' "$@"; then
+			show_current=1
+		else
+			break
+		fi
+		shift $OPTSHIFT
 	done
 
 	mode="${mode:-all}"
@@ -687,26 +695,19 @@ cmd_version()
 	local newname='' newver='' branchname='' inc=''
 
 	while [ "$#" != 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help version
-				return
-				;;
-			--minor)
-				inc=minor
-				;;
-			--major)
-				inc=major
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-				break
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help version
+			return
+		elif option_b '--minor --major' "$@"; then
+			inc="${OPTNAME#--}"
+		else
+			break
+		fi
+		shift $OPTSHIFT
 	done
 
 	parse_refname patchset "${1-}"
@@ -783,26 +784,22 @@ cmd_cover()
 	to=(); cc=(); args=();
 
 	while [ "$#" != 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help cover
-				return
-				;;
-			-e|--edit)
-				mode=edit
-				;;
-			--no-pager)
-				use_pager=
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-				args+=("$1")
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help cover
+			return
+		elif option_b '-e --edit' "$@"; then
+			mode=edit
+		elif option_b '--no-pager' "$@"; then
+			use_pager=
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
 	done
 	set -- "${args[@]}" "$@"
 
@@ -852,16 +849,18 @@ cmd_log()
 	args=()
 
 	while [ "$#" != 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help log
-				return
-				;;
-			*)
-				args+=("$1")
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help log
+			return
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
 	done
 	set -- "${args[@]}"
 
@@ -909,37 +908,24 @@ cmd_export()
 	args=()
 
 	while [ "$#" != 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help export
-				return
-				;;
-			--resend)
-				resend=RESEND
-				;;
-			--rfc)
-				rfc=RFC
-				;;
-			-o|--output-directory|--output-directory=*)
-				case "$1" in
-					-o|--output-directory)
-						shift
-						outdir="$1"
-						;;
-					--output-directory=*)
-						outdir="${1#--output-directory=}"
-						;;
-				esac
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-				args+=("$1")
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help export
+			return
+		elif option_b '--resend' "$@"; then
+			resend=RESEND
+		elif option_b '--rfc' "$@"; then
+			rfc=RFC
+		elif option_s '-o --output-directory' "$@"; then
+			outdir="$OPTVALUE"
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
 	done
 	set -- "${args[@]}" "$@"
 
@@ -1025,16 +1011,18 @@ cmd_send()
 	args=()
 
 	while [ "$#" != 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help send
-				return
-				;;
-			*)
-				args+=("$1")
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help send
+			return
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
 	done
 	set -- "${args[@]}"
 
@@ -1089,26 +1077,22 @@ cmd_archive()
 	args=()
 
 	while [ "$#" != 0 ]; do
-		case "$1" in
-			-h|--help)
-				cmd_help archive
-				return
-				;;
-			-a|--add)
-				ver=v
-				;;
-			-r|--restore)
-				ver=a
-				;;
-			--)
-				shift
-				break
-				;;
-			*)
-				args+=("$1")
-				;;
-		esac
-		shift
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help archive
+			return
+		elif option_b '-a --add' "$@"; then
+			ver=v
+		elif option_b '-r --restore' "$@"; then
+			ver=a
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
 	done
 	set -- "${args[@]}" "$@"
 
