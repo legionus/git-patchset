@@ -46,28 +46,30 @@ readonly P_FULL=0 P_NAME=1 P_TYPE=2 P_VERS=3
 
 # in: refs/heads/patchset/sysctl-ipc/v1.0
 # out: "patchset/sysctl-ipc/v1.0" "sysctl-ipc" "v" "1.0"
-parse_patchset()
+parse_refname()
 {
-	if [[ "$1" =~ ^(refs/)?(heads/)?(patchset/([^/]+)(/([av])([0-9]+.[0-9]+))?) ]]; then
-		patchset=("${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" "${BASH_REMATCH[6]-}" "${BASH_REMATCH[7]-}")
-	elif [[ "$1" =~ ^(([^/]+)(/([av])([0-9]+.[0-9]+))?) ]]; then
-		patchset=("patchset/${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]-}" "${BASH_REMATCH[5]-}")
-	else
-		fatal "branch is not a patchset: $1"
+	local __parse_refname
+
+	if [ "$#" -eq 1 ] || [ -z "${2-}" ]; then
+		__parse_refname="$(git branch --show-current --format='%(refname)')" ||
+			fatal "unable to obtain current branch name"
+		set -- "$1" "$__parse_refname"
 	fi
 
-	local refspec="refs/heads/patchset/${patchset[$P_NAME]}/${patchset[$P_TYPE]-[av]}${patchset[$P_VERS]-[0-9]*}"
+	declare -n "__parse_refname=$1"
 
-	[ -n "$(git for-each-ref --format=1 "$refspec")" ] ||
+	if [[ "$2" =~ ^(refs/)?(heads/)?(patchset/([^/]+)(/([av])([0-9]+.[0-9]+))?) ]]; then
+		set -- "$2" "${BASH_REMATCH[3]}"          "${BASH_REMATCH[4]}" "${BASH_REMATCH[6]-}" "${BASH_REMATCH[7]-}"
+	elif [[ "$2" =~ ^(([^/]+)(/([av])([0-9]+.[0-9]+))?) ]]; then
+		set -- "$2" "patchset/${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]-}" "${BASH_REMATCH[5]-}"
+	else
+		fatal "branch is not a patchset: $2"
+	fi
+
+	[ -n "$(git for-each-ref --format=1 "refs/heads/patchset/${3}/${4-[av]}${5-[0-9]*}")" ] ||
 		fatal "nothing matches the specified refspec: $1"
-}
 
-current_patchset()
-{
-	local ref
-	ref="$(git branch --show-current --format='%(refname)')" ||
-		fatal "unable to obtain current branch name"
-	parse_patchset "$ref"
+	__parse_refname=( [$P_FULL]="$2" [$P_NAME]="$3" [$P_TYPE]="$4" [$P_VERS]="$5" )
 }
 
 builtin_cat()
@@ -436,12 +438,8 @@ cmd_config()
 	done
 	set -- "${args[@]}" "$@"
 
-	if [ "$#" -gt 0 ]; then
-		parse_patchset "$1"
-		shift
-	else
-		current_patchset
-	fi
+	parse_refname patchset "${1-}"
+	[ "$#" -eq 0 ] || shift
 
 	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
@@ -606,12 +604,8 @@ cmd_list()
 
 	case "$mode" in
 		versions)
-			if [ "$#" -gt 0 ]; then
-				parse_patchset "$1"
-				shift
-			else
-				current_patchset
-			fi
+			parse_refname patchset "${1-}"
+			[ "$#" -eq 0 ] || shift
 			;;
 		*)
 			patchset[$P_NAME]='*'
@@ -715,12 +709,8 @@ cmd_version()
 		shift
 	done
 
-	if [ "$#" -gt 0 ]; then
-		parse_patchset "$1"
-		shift
-	else
-		current_patchset
-	fi
+	parse_refname patchset "${1-}"
+	[ "$#" -eq 0 ] || shift
 
 	if [ "$#" -gt 0 ]; then
 		newver="${1#[av]}"
@@ -816,12 +806,8 @@ cmd_cover()
 	done
 	set -- "${args[@]}" "$@"
 
-	if [ "$#" -gt 0 ]; then
-		parse_patchset "$1"
-		shift
-	else
-		current_patchset
-	fi
+	parse_refname patchset "${1-}"
+	[ "$#" -eq 0 ] || shift
 
 	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
@@ -880,10 +866,10 @@ cmd_log()
 	set -- "${args[@]}"
 
 	if [ "$#" -gt 0 ] && [ -n "${1##-*}" ]; then
-		parse_patchset "$1"
+		parse_refname patchset "$1"
 		shift
 	else
-		current_patchset
+		parse_refname patchset
 	fi
 
 	basecommit_for basecommit "${patchset[$P_FULL]}" ||
@@ -958,10 +944,10 @@ cmd_export()
 	set -- "${args[@]}" "$@"
 
 	if [ "$#" != 0 ] && [ -n "${1##-*}" ]; then
-		parse_patchset "$1"
+		parse_refname patchset "$1"
 		shift
 	else
-		current_patchset
+		parse_refname patchset
 	fi
 
 	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
@@ -1057,7 +1043,7 @@ cmd_send()
 		fatal "git-send-email(1) not found" ||:
 
 	if [ "$#" -eq 0 ]; then
-		current_patchset
+		parse_refname patchset
 
 		workdir="$(git rev-parse --absolute-git-dir)/$PROGCMD-send" ||
 			fatal "unable to find git directory"
@@ -1135,12 +1121,8 @@ cmd_archive()
 			;;
 	esac
 
-	if [ "$#" -gt 0 ]; then
-		parse_patchset "$1"
-		shift
-	else
-		current_patchset
-	fi
+	parse_refname patchset "${1-}"
+	[ "$#" -eq 0 ] || shift
 
 	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
