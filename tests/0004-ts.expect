@@ -60,31 +60,31 @@ Switched to branch 'patchset/baz/v3.0'
 Your branch is up to date with 'patchset/bar/v3.0'.
 git-patchset: created a new version of patchset: patchset/baz/v3.0
 ### list of patchsets
-- aaaaaaa..bbbbbbb     (0) bar/v1.0
-- aaaaaaa..bbbbbbb     (0) bar/v1.1
-- aaaaaaa..bbbbbbb     (0) bar/v1.2
-- aaaaaaa..bbbbbbb     (0) bar/v2.0
-- aaaaaaa..bbbbbbb     (0) bar/v3.0
-- aaaaaaa..bbbbbbb     (0) baz/v1.0
-- aaaaaaa..bbbbbbb     (0) baz/v1.1
-- aaaaaaa..bbbbbbb     (0) baz/v1.2
-- aaaaaaa..bbbbbbb     (0) baz/v2.0
-* aaaaaaa..bbbbbbb     (0) baz/v3.0
-- aaaaaaa..bbbbbbb     (0) foo/v1.0
-- aaaaaaa..bbbbbbb     (0) foo/v1.1
-- aaaaaaa..bbbbbbb     (0) foo/v1.2
-- aaaaaaa..bbbbbbb     (0) foo/v2.0
-- aaaaaaa..bbbbbbb     (0) foo/v3.0
+- aaaaaaa..bbbbbbb     (0) patchset/bar/v1.0
+- aaaaaaa..bbbbbbb     (0) patchset/bar/v1.1
+- aaaaaaa..bbbbbbb     (0) patchset/bar/v1.2
+- aaaaaaa..bbbbbbb     (0) patchset/bar/v2.0
+- aaaaaaa..bbbbbbb     (0) patchset/bar/v3.0
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.0
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.1
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.2
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v2.0
+* aaaaaaa..bbbbbbb     (0) patchset/baz/v3.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v1.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v1.1
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v1.2
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v2.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v3.0
 ### list of latest patchsets
-- aaaaaaa..bbbbbbb     (0) bar/v3.0
-* aaaaaaa..bbbbbbb     (0) baz/v3.0
-- aaaaaaa..bbbbbbb     (0) foo/v3.0
+- aaaaaaa..bbbbbbb     (0) patchset/bar/v3.0
+* aaaaaaa..bbbbbbb     (0) patchset/baz/v3.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v3.0
 ### list of foo verions
-- aaaaaaa..bbbbbbb     (0) foo/v1.0
-- aaaaaaa..bbbbbbb     (0) foo/v1.1
-- aaaaaaa..bbbbbbb     (0) foo/v1.2
-- aaaaaaa..bbbbbbb     (0) foo/v2.0
-- aaaaaaa..bbbbbbb     (0) foo/v3.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v1.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v1.1
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v1.2
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v2.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/v3.0
 ### list of branches
   master
   patchset/bar/v1.0

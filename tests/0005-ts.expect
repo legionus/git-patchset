@@ -73,35 +73,35 @@ git-patchset: patchset/bar/v1.2 -> patchset/../a1.2
 git-patchset: patchset/bar/v2.0 -> patchset/../a2.0
 git-patchset: patchset/bar/v3.0 -> patchset/../a3.0
 ### default list
-* aaaaaaa..bbbbbbb     (0) baz/v3.0
+* aaaaaaa..bbbbbbb     (0) patchset/baz/v3.0
 ### list of patchsets
-- aaaaaaa..bbbbbbb     (0) baz/v1.0
-- aaaaaaa..bbbbbbb     (0) baz/v1.1
-- aaaaaaa..bbbbbbb     (0) baz/v1.2
-- aaaaaaa..bbbbbbb     (0) baz/v2.0
-* aaaaaaa..bbbbbbb     (0) baz/v3.0
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.0
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.1
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.2
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v2.0
+* aaaaaaa..bbbbbbb     (0) patchset/baz/v3.0
 ### list of latest patchsets
-* aaaaaaa..bbbbbbb     (0) baz/v3.0
+* aaaaaaa..bbbbbbb     (0) patchset/baz/v3.0
 ### list of foo verions
-- aaaaaaa..bbbbbbb     (0) baz/v1.0
-- aaaaaaa..bbbbbbb     (0) baz/v1.1
-- aaaaaaa..bbbbbbb     (0) baz/v1.2
-- aaaaaaa..bbbbbbb     (0) baz/v2.0
-* aaaaaaa..bbbbbbb     (0) baz/v3.0
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.0
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.1
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v1.2
+- aaaaaaa..bbbbbbb     (0) patchset/baz/v2.0
+* aaaaaaa..bbbbbbb     (0) patchset/baz/v3.0
 ### list of latest versions in archive
-- aaaaaaa..bbbbbbb     (0) bar/a3.0
-- aaaaaaa..bbbbbbb     (0) foo/a3.0
+- aaaaaaa..bbbbbbb     (0) patchset/bar/a3.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/a3.0
 ### list of archive
-- aaaaaaa..bbbbbbb     (0) bar/a1.0
-- aaaaaaa..bbbbbbb     (0) bar/a1.1
-- aaaaaaa..bbbbbbb     (0) bar/a1.2
-- aaaaaaa..bbbbbbb     (0) bar/a2.0
-- aaaaaaa..bbbbbbb     (0) bar/a3.0
-- aaaaaaa..bbbbbbb     (0) foo/a1.0
-- aaaaaaa..bbbbbbb     (0) foo/a1.1
-- aaaaaaa..bbbbbbb     (0) foo/a1.2
-- aaaaaaa..bbbbbbb     (0) foo/a2.0
-- aaaaaaa..bbbbbbb     (0) foo/a3.0
+- aaaaaaa..bbbbbbb     (0) patchset/bar/a1.0
+- aaaaaaa..bbbbbbb     (0) patchset/bar/a1.1
+- aaaaaaa..bbbbbbb     (0) patchset/bar/a1.2
+- aaaaaaa..bbbbbbb     (0) patchset/bar/a2.0
+- aaaaaaa..bbbbbbb     (0) patchset/bar/a3.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/a1.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/a1.1
+- aaaaaaa..bbbbbbb     (0) patchset/foo/a1.2
+- aaaaaaa..bbbbbbb     (0) patchset/foo/a2.0
+- aaaaaaa..bbbbbbb     (0) patchset/foo/a3.0
 ### list of branches
   master
   patchset/bar/a1.0

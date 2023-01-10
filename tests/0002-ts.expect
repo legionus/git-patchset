@@ -4,7 +4,7 @@ Switched to a new branch 'patchset/foo/v1.0'
 Branch 'patchset/foo/v1.0' set up to track local branch 'master'.
 git-patchset: new patchset created: patchset/foo/v1.0
 ### list of patchsets
-* aaaaaaa..bbbbbbb     (0) foo/v1.0
+* aaaaaaa..bbbbbbb     (0) patchset/foo/v1.0
 ### list of branches
   master
 * patchset/foo/v1.0
