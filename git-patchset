@@ -331,6 +331,12 @@ list_recipients()
 	done
 }
 
+get_subject_prefix()
+{
+	git config --get "branch.$1.subject-prefix" |
+		sed -e 's#[[:space:]]\+# #g'
+}
+
 describe_patchset()
 {
 	local branchname basecommit subject_prefix ver recipients range
@@ -339,7 +345,7 @@ describe_patchset()
 	basecommit_for basecommit "$branchname" ||
 		return 1
 
-	subject_prefix="$(git config --get branch.$branchname.subject-prefix)" ||:
+	subject_prefix="$(get_subject_prefix "$branchname")"
 	subject_prefix="${subject_prefix:+$subject_prefix }PATCH"
 
 	ver="${branchname##*/[av]}"
@@ -971,15 +977,9 @@ cmd_export()
 	list_recipients add_arg cc "patchset.cc" "branch.${patchset[$P_FULL]}.cc"
 	set -- "$@" "${args[@]}"
 
-	while read -r arg; do
-		[ -z "$arg" ] ||
-			subject_prefix="${subject_prefix:+$subject_prefix }$arg"
-	done <<< $(
-		echo $resend $rfc;
-		git config --get branch.${patchset[$P_FULL]}.subject-prefix ||:;
-		echo PATCH;
-	)
-
+	for arg in $resend $rfc $(get_subject_prefix "${patchset[$P_FULL]}") PATCH; do
+		subject_prefix="${subject_prefix:+$subject_prefix }$arg"
+	done
 	set -- "$@" "--subject-prefix=$subject_prefix"
 
 	basecommit_for basecommit "${patchset[$P_HEAD]}" ||
