@@ -31,6 +31,13 @@ quote_regexp()
 }
 
 workdir=
+create_workdir()
+{
+	workdir="$(git rev-parse --absolute-git-dir)/$PROGCMD" ||
+		fatal "unable to find git directory"
+	mkdir -p -- "$workdir"
+}
+
 cleanup_handler()
 {
 	trap - EXIT
@@ -174,9 +181,16 @@ get_subject_prefix()
 
 update_description_from_tag()
 {
-	! git rev-parse --short "refs/tags/$1" &>/dev/null ||
-		git config "branch.$1.description" \
-			"$(git cat-file tag "refs/tags/$1" | sed -e '1,/^$/d')" ||
+	git rev-parse --short "refs/tags/$1" &>/dev/null ||
+		return 0
+
+	create_workdir
+
+	git cat-file tag "refs/tags/$1" |
+		sed -e '1,/^$/d' >"$workdir"/BRANCH_DESCRIPTION
+
+	GIT_EDITOR="mv -f -- '$workdir/BRANCH_DESCRIPTION'" \
+		git branch --edit-description "$1" ||
 		fatal "unable to update branch description for $1"
 }
 
@@ -218,7 +232,7 @@ help_create()
 
 cmd_create()
 {
-	local args branchname='' startpoint='' mbox='' no_edit_cover=''
+	local args branchname='' startpoint='' mbox='' no_edit_cover='' newver='v1.0'
 
 	args=()
 	while [ "$#" -gt 0 ]; do
@@ -265,24 +279,17 @@ cmd_create()
 	[ -n "$branchname" ] ||
 		fatal "empty branch name is not allowed"
 
-	local newver="v1.0"
-	local cover="*** SUBJECT HERE ***
+	create_workdir
 
-*** PATCHSET DESCRIPTION HERE ***
+	printf >"$workdir"/BRANCH_DESCRIPTION '%s\n\n' \
+		'*** SUBJECT HERE ***' \
+		'*** PATCHSET DESCRIPTION HERE ***' \
+		'--'
 
---
-"
 	if [ -s "$mbox" ]; then
 		if ! type -p b4 >/dev/null; then
 			errmsg="the b4 utility is required to import mbox"
 			break
-		fi
-
-		workdir="$(git rev-parse --absolute-git-dir)/$PROGCMD-create"
-
-		if ! mkdir -- "$workdir"; then
-			workdir=''
-			fatal "unable to create temporary directory: $workdir"
 		fi
 
 		b4 -q am -o "$workdir" -m "$mbox" ||
@@ -303,10 +310,11 @@ cmd_create()
 		fn="$(set +f && echo "$workdir"/*.cover)"
 		if [ -s "$fn" ]; then
 			git mailinfo "$fn.msg" /dev/null < "$fn" > "$fn.info"
-			cover="$(sed -n -e 's/^Subject:[[:space:]]\+//p' "$fn.info")
-
-$(<"$fn.msg")
-"
+			{
+				sed -n -e 's/^Subject:[[:space:]]\+//p' "$fn.info"
+				printf '\n'
+				builtin_cat < "$fn.msg"
+			} >"$workdir"/BRANCH_DESCRIPTION
 		fi
 	fi
 
@@ -318,11 +326,12 @@ $(<"$fn.msg")
 	[ -z "$mbox" ] ||
 		git am -- "$mbox"
 
-	git config "branch.patchset/$branchname/$newver.description" "$cover" ||
-		fatal "unable to write empty description for patchset/$branchname/$newver"
+	GIT_EDITOR="mv -f -- '$workdir/BRANCH_DESCRIPTION'" \
+		git branch --edit-description ||
+		fatal "unable to write branch description"
 
 	[ -n "$mbox" ] || [ -n "$no_edit_cover" ] ||
-		git branch --edit-description "patchset/$branchname/$newver" ||
+		git branch --edit-description ||
 			fatal "unable to change description"
 	update_tag_from_description "patchset/$branchname/$newver"
 
@@ -1060,17 +1069,15 @@ cmd_send()
 	if [ "$#" -eq 0 ]; then
 		parse_refname patchset
 
-		workdir="$(git rev-parse --absolute-git-dir)/$PROGCMD-send" ||
-			fatal "unable to find git directory"
+		create_workdir
 
-		if ! mkdir -- "$workdir" >/dev/null 2>&1; then
-			[ -d "$workdir" ] ||
-				fatal "unable to create temporary directory: $workdir"
+		if ! mkdir -- "$workdir/export" >/dev/null 2>&1; then
 			workdir=
 			fatal "another git-$PROGCMD-send(1) in progress"
 		fi
+		set -- "$workdir/export"
 
-		cmd_export "${patchset[$P_FULL]}" -o "$workdir" >/dev/null
+		cmd_export "${patchset[$P_FULL]}" -o "$1" >/dev/null
 	fi
 
 	git send-email --to=' ' --confirm=always --format-patch --suppress-from "$@"
