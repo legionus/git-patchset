@@ -19,17 +19,6 @@ fatal()
 	exit 1
 }
 
-quote_regexp()
-{
-	local out="$*"
-	if [ -z "${out##*[\[\].*&^\$\\\\/]*}" ]; then
-		out="$(printf %s "$out" |
-				sed -e 's/[].*&^$[\/]/\\&/g')" ||
-			return 1
-	fi
-	printf '%s' "$out"
-}
-
 workdir=
 create_workdir()
 {
@@ -115,6 +104,16 @@ builtin_cat()
 		read -r -N 1 s || eof=1
 		printf '%s' "$s"
 	done
+}
+
+in_array()
+{
+	local e; e="$1"; shift
+	while [ "$#" -gt 0 ]; do
+		[ "$1" != "$e" ] || return 0
+		shift
+	done
+	return 1
 }
 
 get_pager()
@@ -340,7 +339,7 @@ cmd_create()
 
 list_recipients()
 {
-	local arr i a handler data
+	local arr i handler data
 
 	handler="$1"; shift
 	data="$1"; shift
@@ -348,12 +347,10 @@ list_recipients()
 	arr=()
 	while [ "$#" -gt 0 ]; do
 		while read -r i; do
-			[ -n "$i" ] || continue
-			for a in "${recipients[@]}"; do
-				[ "$i" != "$a" ] || continue 2
-			done
-			arr+=("$i")
-			recipients+=("$i")
+			if [ -n "$i" ] && ! in_array "$i" "${recipients[@]}"; then
+				recipients+=("$i")
+				arr+=("$i")
+			fi
 		done <<< $(git config --get-all "$1" ||:;)
 		shift
 	done
@@ -407,16 +404,29 @@ fetch_config_section()
 	infile="$1"; shift
 	outfile="$1"; shift
 
+	add_to_list()
+	{
+		local a; declare -n "a=$1"; shift
+		while [ "$#" -gt 0 ]; do
+			in_array "$1" "${a[@]}" || a+=("$1")
+			shift
+		done
+	}
+
 	list_config_keys()
 	{
 		eval "$1=()"
-		readarray -t "$1" <<< $(
+		add_to_list "$1" \
+				"patchset.to" "branch.$branchname.to" \
+				"patchset.cc" "branch.$branchname.cc"
+		while read -r e; do
 			for n in "patchset." "branch.$branchname."; do
-				printf '%s\n' "${n}to" "${n}cc"
-				git config -f "$2" --name-only --get-regexp "^$(quote_regexp "$n")" |
-					grep -v -e '\.\(to\|cc\|description\)$' |
-					sort -u
-			done)
+				case "${e#$n}" in
+					*.*|cc|to|description)   ;;
+					*) add_to_list "$1" "$e" ;;
+				esac
+			done
+		done < <(git config -f "$2" --name-only --list)
 	}
 
 	list_config_keys inkeys "$infile"
@@ -431,10 +441,8 @@ fetch_config_section()
 	done
 
 	for outname in "${outkeys[@]}"; do
-		for inname in "${inkeys[@]}"; do
-			[ "$inname" != "$outname" ] || continue 2
-		done
-		git config -f "$outfile" --unset-all "$outname"
+		in_array "$outname" "${inkeys[@]}" ||
+			git config -f "$outfile" --unset-all "$outname"
 	done
 }
 
@@ -529,16 +537,14 @@ cmd_config()
 
 		add_recipient()
 		{
-			local field counter a n
+			local field counter a
 			field="$1"; shift
 			counter="$1"; shift
 			for a in "$@"; do
-				for n in "${arr[@]}" ; do
-					if [ "$n" = "$a" ]; then
-						message "address already exists: $n"
-						continue 2
-					fi
-				done
+				if in_array "$a" "${arr[@]}"; then
+					message "address already exists: $a"
+					continue
+				fi
 				git config --add "$cfg_prefix.$field" "$a"
 				eval "$counter=\$((\$$counter + 1))"
 			done
