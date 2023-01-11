@@ -306,6 +306,31 @@ $(<"$fn.msg")
 	message "new patchset created: patchset/$branchname/$newver"
 }
 
+list_recipients()
+{
+	local arr i a handler data
+
+	handler="$1"; shift
+	data="$1"; shift
+
+	arr=()
+	while [ "$#" -gt 0 ]; do
+		while read -r i; do
+			[ -n "$i" ] || continue
+			for a in "${recipients[@]}"; do
+				[ "$i" != "$a" ] || continue 2
+			done
+			arr+=("$i")
+			recipients+=("$i")
+		done <<< $(git config --get-all "$1" ||:;)
+		shift
+	done
+
+	for i in "${!arr[@]}"; do
+		"$handler" "${#arr[@]}" "$i" "${arr[$i]}" "$data"
+	done
+}
+
 describe_patchset()
 {
 	local branchname basecommit subject_prefix ver recipients range
@@ -320,38 +345,21 @@ describe_patchset()
 	ver="${branchname##*/[av]}"
 	ver="${ver%%.*}"
 
-	recipients=()
-
-	show_field_list()
+	print_field()
 	{
-		local arr i a n="$1"
-
-		readarray -t arr <<< $(
-			git config --get-all patchset.$2 ||:;
-			git config --get-all branch.$branchname.$2 ||:;
-		)
-
-		for i in "${!arr[@]}"; do
-			[ -n "${arr[$i]}" ] ||
-				continue
-			for a in "${recipients[@]}"; do
-				[ "${arr[$i]}" != "$a" ] ||
-					continue 2
-			done
-			recipients+=("${arr[$i]}")
-			printf "%-${#1}s %s" "$n" "${arr[$i]}"
-			[ "$i" = "$(( ${#arr[@]} - 1 ))" ] ||
-				printf ','
-			printf '\n'
-			n=
-		done
+		local sz="$1" i="$2" v="$3" f="$4"
+		[ "$i" -eq 0 ] || f=""
+		printf "%-${#4}s %s" "$f" "$v"
+		[ "$i" -eq "$(( $sz - 1 ))" ] || printf ','
+		printf '\n'
 	}
 
+	recipients=()
 	range="$basecommit..refs/heads/$branchname"
 
 	printf -- 'From %s %s\n' "$(git config --get user.email)" "$(LANG=C date -u)" ||:
-	show_field_list To: to
-	show_field_list Cc: cc
+	list_recipients print_field "To:" "patchset.to" "branch.$branchname.to"
+	list_recipients print_field "Cc:" "patchset.cc" "branch.$branchname.cc"
 	printf -- 'Subject: [%s v%s 0/%s] ' "$subject_prefix" "$ver" "$(git rev-list --count "$range")"
 	git config "branch.$branchname.description" |
 		sed -n -e '1,/^--$/ { /^--$/d; p }'
@@ -918,7 +926,7 @@ help_export()
 
 cmd_export()
 {
-	local subject_prefix='' basecommit arg rec args patchset recipients
+	local subject_prefix='' basecommit arg args patchset recipients
 	local resend='' rfc='' outdir=''
 
 	args=()
@@ -955,29 +963,17 @@ cmd_export()
 	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
 
+	args=()
+	add_arg() { args+=("--$4=$3"); }
+
 	recipients=()
+	list_recipients add_arg to "patchset.to" "branch.${patchset[$P_FULL]}.to"
+	list_recipients add_arg cc "patchset.cc" "branch.${patchset[$P_FULL]}.cc"
+	set -- "$@" "${args[@]}"
 
-	for arg in to cc; do
-		while read -r n; do
-			[ -n "$n" ] ||
-				continue
-			for rec in "${recipients[@]}"; do
-				[ "$n" != "$rec" ] ||
-					continue 2
-			done
-
-			set -- "$@" "--$arg=$n"
-
-			recipients+=("$n")
-		done <<< $(
-			git config --get-all patchset.$arg ||:;
-			git config --get-all branch.${patchset[$P_FULL]}.$arg ||:;
-		)
-	done
-
-	while read -r n; do
-		[ -z "$n" ] ||
-			subject_prefix="${subject_prefix:+$subject_prefix }$n"
+	while read -r arg; do
+		[ -z "$arg" ] ||
+			subject_prefix="${subject_prefix:+$subject_prefix }$arg"
 	done <<< $(
 		echo $resend $rfc;
 		git config --get branch.${patchset[$P_FULL]}.subject-prefix ||:;
