@@ -166,6 +166,31 @@ basecommit_for()
 	eval "$1=\"\$__basecommit_for\""
 }
 
+get_subject_prefix()
+{
+	git config --get "branch.$1.subject-prefix" |
+		sed -e 's#[[:space:]]\+# #g'
+}
+
+update_description_from_tag()
+{
+	! git rev-parse --short "refs/tags/$1" &>/dev/null ||
+		git config "branch.$1.description" \
+			"$(git cat-file tag "refs/tags/$1" | sed -e '1,/^$/d')" ||
+		fatal "unable to update branch description for $1"
+}
+
+update_tag_from_description()
+{
+	local commit
+
+	commit="$(git config "branch.$1.merge")"     || return 0
+	commit="$(git rev-parse --verify "$commit")" || return 0
+
+	git config "branch.$1.description" |
+		git tag --annotate --file=- --force "$1" "$commit"
+}
+
 help_create()
 {
 	case "$1" in
@@ -296,12 +321,10 @@ $(<"$fn.msg")
 	git config "branch.patchset/$branchname/$newver.description" "$cover" ||
 		fatal "unable to write empty description for patchset/$branchname/$newver"
 
-	if [ -z "$mbox" ] && [ -z "$no_edit_cover" ]; then
+	[ -n "$mbox" ] || [ -n "$no_edit_cover" ] ||
 		git branch --edit-description "patchset/$branchname/$newver" ||
 			fatal "unable to change description"
-		cover="$(git config "branch.patchset/$branchname/$newver.description")"
-	fi
-	git tag --annotate --file=- "patchset/$branchname/$newver" <<<"$cover"
+	update_tag_from_description "patchset/$branchname/$newver"
 
 	message "new patchset created: patchset/$branchname/$newver"
 }
@@ -329,12 +352,6 @@ list_recipients()
 	for i in "${!arr[@]}"; do
 		"$handler" "${#arr[@]}" "$i" "${arr[$i]}" "$data"
 	done
-}
-
-get_subject_prefix()
-{
-	git config --get "branch.$1.subject-prefix" |
-		sed -e 's#[[:space:]]\+# #g'
 }
 
 describe_patchset()
@@ -835,16 +852,12 @@ cmd_cover()
 	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
 
+	update_description_from_tag "${patchset[$P_FULL]}"
+
 	case "$mode" in
 		edit)
 			git branch --edit-description "${patchset[$P_FULL]}"
-
-			commit="$(git config "branch.${patchset[$P_FULL]}.merge")"
-			commit="$(git rev-parse --verify "$commit")"
-
-			git config "branch.${patchset[$P_FULL]}.description" |
-				git tag --annotate --file=- --force \
-					"${patchset[$P_FULL]}" "$commit"
+			update_tag_from_description "${patchset[$P_FULL]}"
 			;;
 		list)
 			if [ -n "$use_pager" ] && [ -t 1 ]; then
@@ -994,6 +1007,8 @@ cmd_export()
 
 	[ -d "$outdir" ] ||
 		mkdir -p -- "$outdir"
+
+	update_description_from_tag "${patchset[$P_FULL]}"
 
 	git format-patch -v "$ver" --thread --minimal --cover-from-description=auto \
 		-o "$outdir" \
