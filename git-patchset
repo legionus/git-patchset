@@ -135,7 +135,7 @@ basecommit_for()
 		name="${1#refs/}"
 		name="${name#heads/}"
 
-		if merge="$(git rev-parse --short "refs/tags/$name" 2>/dev/null)"; then
+		if merge="$(git rev-parse --short "refs/tags/$name/cover" 2>/dev/null)"; then
 			__basecommit_for="$merge"
 			return
 		fi
@@ -180,12 +180,12 @@ get_subject_prefix()
 
 update_description_from_tag()
 {
-	git rev-parse --short "refs/tags/$1" &>/dev/null ||
+	git rev-parse --short "refs/tags/$1/cover" &>/dev/null ||
 		return 0
 
 	create_workdir
 
-	git cat-file tag "refs/tags/$1" |
+	git cat-file tag "refs/tags/$1/cover" |
 		sed -e '1,/^$/d' >"$workdir"/BRANCH_DESCRIPTION
 
 	GIT_EDITOR="mv -f -- '$workdir/BRANCH_DESCRIPTION'" \
@@ -201,7 +201,7 @@ update_tag_from_description()
 	commit="$(git rev-parse --verify "$commit")" || return 0
 
 	git config "branch.$1.description" |
-		git tag --annotate --file=- --force "$1" "$commit"
+		git tag --annotate --file=- --force "$1/cover" "$commit"
 }
 
 help_create()
