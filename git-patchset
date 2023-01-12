@@ -1279,11 +1279,12 @@ trap signal_handler HUP PIPE INT QUIT TERM
 
 case "$cmd" in
 	-h|help)	cmd_help	"$@"	;;
+	ar|archive)	cmd_archive	"$@"	;;
 	cr|create)	cmd_create	"$@"	;;
 	ex|export)	cmd_export	"$@"	;;
 	ls|list)	cmd_list	"$@"	;;
 	vr|version)	cmd_version	"$@"	;;
-	config|cover|log|send|archive)
+	config|cover|log|send)
 			cmd_"$cmd"	"$@"	;;
 	*)
 		fatal "unknown command: $cmd"
