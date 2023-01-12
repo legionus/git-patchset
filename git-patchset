@@ -451,7 +451,7 @@ help_config()
 	case "$1" in
 		usage) builtin_cat <<-EOF
 			config [-e|--edit] [<patchset>]
-			config [--global] [--to=<email>] [--cc=<email>] [<patchset>]
+			config [--global] [--to=<email> ...] [--cc=<email> ...] [--rfc] [--tag=TAG ...] [<patchset>]
 			EOF
 			;;
 		descr) builtin_cat <<-EOF
@@ -465,6 +465,8 @@ help_config()
 			  --global        add <email> globally for all patchsets.
 			  --to=<email>    add a To: header to the email headers.
 			  --cc=<email>    add a Cc: header to the email headers.
+			  --rfc           shortcut to add RFC tag to the subject.
+			  --tag=TAG       add TAG to the subject.
 			  -e, --edit      open editor to change options.
 			  -h, --help      show this text and exit.
 			EOF
@@ -475,9 +477,9 @@ help_config()
 cmd_config()
 {
 	local mode=edit
-	local to cc args patchset cfg_prefix=''
+	local to cc arr args patchset cfg_prefix='' do_edit='' tags
 
-	to=(); cc=(); args=();
+	to=(); cc=(); args=(); tags=();
 
 	while [ "$#" != 0 ]; do
 		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
@@ -488,15 +490,17 @@ cmd_config()
 			cmd_help config
 			return
 		elif option_b '-e --edit' "$@"; then
-			mode=edit
+			do_edit=1
 		elif option_b '--global' "$@"; then
 			cfg_prefix="patchset"
 		elif option_s '--to' "$@"; then
 			to+=("$OPTVALUE")
-			mode=tocc
 		elif option_s '--cc' "$@"; then
 			cc+=("$OPTVALUE")
-			mode=tocc
+		elif option_b '--rfc' "$@"; then
+			tags+=("RFC")
+		elif option_s '--tag' "$@"; then
+			tags+=("$OPTVALUE")
 		else
 			args+=("$1")
 			OPTSHIFT=1
@@ -519,9 +523,9 @@ cmd_config()
 			fatal "options --edit and --global are mutually exclusive"
 	fi
 
-	if [ "${#to[@]}" != 0 ] || [ "${#cc[@]}" != 0 ]; then
-		local cc_nr=0 to_nr=0 arr
+	local cc_nr=0 to_nr=0
 
+	if [ "${#to[@]}" != 0 ] || [ "${#cc[@]}" != 0 ]; then
 		arr=()
 		readarray -t arr <<< $(
 			git config --get-all patchset.to ||:;
@@ -554,13 +558,34 @@ cmd_config()
 		add_recipient cc cc_nr "${cc[@]}"
 	fi
 
-	case "$mode" in
-		edit)
-			local git_dir rc=0
+	local tag_nr=0
 
-			git_dir="$(git rev-parse --absolute-git-dir)"
+	if [ "${#tags[@]}" != 0 ]; then
+		arr=( $(git config --get "branch.${patchset[$P_FULL]}.subject-prefix") )
 
-			builtin_cat > "$git_dir/config.patchset.ini" <<EOF
+		for a in "${tags[@]}"; do
+			if in_array "$a" "${arr[@]}"; then
+				message "subject tag already exists: $a"
+				continue
+			fi
+			arr+=("$a")
+			tag_nr=$(( $tag_nr + 1 ))
+		done
+		git config "branch.${patchset[$P_FULL]}.subject-prefix" "${arr[*]}"
+	fi
+
+	[ "${#to[@]}"   = 0 ] || message "added $to_nr new addresses to \`To' list"
+	[ "${#cc[@]}"   = 0 ] || message "added $cc_nr new addresses to \`Cc' list"
+	[ "${#tags[@]}" = 0 ] || message "added $tag_nr new tags to subject prefix"
+
+	[ -n "$do_edit" ] ||
+		return 0
+
+	local git_dir rc=0
+
+	git_dir="$(git rev-parse --absolute-git-dir)"
+
+	builtin_cat > "$git_dir/config.patchset.ini" <<EOF
 [patchset]
 
 [branch "${patchset[$P_FULL]}"]
@@ -578,31 +603,24 @@ cmd_config()
 # Add value to the subject of each patch.
 #
 EOF
-			(
-				fetch_config_section "${patchset[$P_FULL]}" \
-					"$git_dir/config" \
-					"$git_dir/config.patchset.ini"
+	(
+		fetch_config_section "${patchset[$P_FULL]}" \
+			"$git_dir/config" \
+			"$git_dir/config.patchset.ini"
 
-				git config \
-					--file "$git_dir/config.patchset.ini" \
-					--edit
+		git config \
+			--file "$git_dir/config.patchset.ini" \
+			--edit
 
-				fetch_config_section "${patchset[$P_FULL]}" \
-					"$git_dir/config.patchset.ini" \
-					"$git_dir/config"
-			) || rc=$?
+		fetch_config_section "${patchset[$P_FULL]}" \
+			"$git_dir/config.patchset.ini" \
+			"$git_dir/config"
+	) || rc=$?
 
-			rm -f -- "$git_dir/config.patchset.ini"
+	rm -f -- "$git_dir/config.patchset.ini"
 
-			[ "$rc" = 0 ] ||
-				return $rc
-			;;
-		tocc)
-			[ "${#to[@]}" = 0 ] || message "added $to_nr new addresses to \`To' list"
-			[ "${#cc[@]}" = 0 ] || message "added $cc_nr new addresses to \`Cc' list"
-			;;
-	esac
-
+	[ "$rc" = 0 ] ||
+		return $rc
 }
 
 help_list()
