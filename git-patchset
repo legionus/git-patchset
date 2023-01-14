@@ -687,6 +687,9 @@ cmd_list()
 		versions)
 			parse_refname patchset "${1-}"
 			[ "$#" -eq 0 ] || shift
+
+			[ -z "${patchset[$P_TYPE]}" ] ||
+				ver="${patchset[$P_TYPE]}"
 			;;
 		*)
 			patchset[$P_NAME]='*'
