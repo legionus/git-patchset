@@ -283,7 +283,7 @@ cmd_create()
 	printf >"$workdir"/BRANCH_DESCRIPTION '%s\n\n' \
 		'*** SUBJECT HERE ***' \
 		'*** PATCHSET DESCRIPTION HERE ***' \
-		'--'
+		'---'
 
 	if [ -s "$mbox" ]; then
 		if ! type -p b4 >/dev/null; then
@@ -391,8 +391,8 @@ describe_patchset()
 	list_recipients print_field "Cc:" "patchset.cc" "branch.$branchname.cc"
 	printf -- 'Subject: [%s v%s 0/%s] ' "$subject_prefix" "$ver" "$(git rev-list --count "$range")"
 	git config "branch.$branchname.description" |
-		sed -n -e '1,/^--$/ { /^--$/d; p }'
-	printf -- '--\n\n'
+		sed -n -e '1,/^---$/ { /^---$/d; p }'
+	printf -- '---\n\n'
 	git rev-list --date-order --reverse --abbrev-commit --format=oneline "$range"
 }
 
