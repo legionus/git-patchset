@@ -204,6 +204,15 @@ update_tag_from_description()
 		git tag --annotate --file=- --force "$1/cover" "$commit"
 }
 
+get_thread_id_from_files()
+{
+	if [ -s "$1" ]; then
+		sed -ne '1,/^$/ { s/^Message-Id:[[:space:]]\+//p }' "$1"
+		return 0
+	fi
+	return 1
+}
+
 help_create()
 {
 	case "$1" in
@@ -422,7 +431,7 @@ fetch_config_section()
 		while read -r e; do
 			for n in "patchset." "branch.$branchname."; do
 				case "${e#$n}" in
-					*.*|cc|to|description)   ;;
+					*.*|cc|to|description|message-id-export|message-id-sent) ;;
 					*) add_to_list "$1" "$e" ;;
 				esac
 			done
@@ -637,11 +646,12 @@ help_list()
 		options) builtin_cat <<-EOF
 
 			Options:
-			  --all        show all versions of all patchsets.
-			  --latest     show only latest versions of patchsets.
-			  --versions   show all versions of current patchset.
-			  --archive    show archived patchsets.
-			  -h, --help   show this text and exit.
+			  --all            show all versions of all patchsets.
+			  --latest         show only latest versions of patchsets.
+			  --versions       show all versions of current patchset.
+			  --archive        show archived patchsets.
+			  -T, --no-tags    hide patchset tags.
+			  -h, --help       show this text and exit.
 			EOF
 			;;
 	esac
@@ -649,7 +659,7 @@ help_list()
 
 cmd_list()
 {
-	local mode='latest' ver=v show_current='' patchset
+	local mode='latest' ver=v show_current='' no_tags='' patchset
 
 	while [ "$#" != 0 ]; do
 		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
@@ -659,6 +669,8 @@ cmd_list()
 		elif option_b '-h --help' "$@"; then
 			cmd_help list
 			return
+		elif option_b '-T --no-tags' "$@"; then
+			no_tags=1
 		elif option_b '--all --latest --versions' "$@"; then
 			mode="${OPTNAME#--}"
 		elif option_b '--archive' "$@"; then
@@ -671,12 +683,13 @@ cmd_list()
 		shift $OPTSHIFT
 	done
 
-	local ColorRange='' ColorReset='' ColorCurrent='' ColorDefault=''
+	local ColorRange='' ColorReset='' ColorCurrent='' ColorDefault='' ColorTag=''
 
 	if [ "$color" = always ]; then
 		ColorDefault="$(git config --get-color "" "white")"
 		ColorCurrent="$(git config --get-color "" "bold")"
 		ColorRange="$(  git config --get-color "" "yellow")"
+		ColorTag="$(    git config --get-color "" "green")"
 		ColorReset="$(  git config --get-color "" "reset")"
 	fi
 
@@ -726,12 +739,24 @@ cmd_list()
 				current="$ColorCurrent" ||
 				current=''
 
-			printf '%1s %s..%s %7s %s%s\n' \
+			tags=()
+
+			if [ -z "$no_tags" ]; then
+				! git config "branch.$branchname.message-id-export" &>/dev/null ||
+					tags+=("exported")
+
+				! git config "branch.$branchname.message-id-sent" &>/dev/null ||
+					tags+=("sent")
+			fi
+
+			printf '%1s %s..%s %7s %s%s%s%s\n' \
 				"${current}${ColorDefault}${mark}" \
 				"${ColorRange}${basecommit}" \
 				"${objectname}${ColorDefault}" \
 				"($(git rev-list --count "$basecommit..$objectname"))" \
-				"${branchname}${ColorReset}"
+				"${branchname}" \
+				"${tags:+ ${ColorTag}[${tags[*]}]${ColorDefault}}" \
+				"${ColorReset}"
 			break
 		done
 
@@ -978,7 +1003,7 @@ help_export()
 
 cmd_export()
 {
-	local subject_prefix='' basecommit arg args patchset recipients
+	local subject_prefix='' basecommit arg args patchset recipients ver
 	local resend='' rfc='' outdir=''
 
 	args=()
@@ -1031,10 +1056,9 @@ cmd_export()
 	basecommit_for basecommit "${patchset[$P_HEAD]}" ||
 		return 1
 
-	if [ -z "${patchset[$P_VERS]##*[!0-9]*}" ]; then
-		# git-format-patch: switch `v' expects a numerical value
-		ver="${patchset[$P_VERS]%%[!0-9]*}"
-	fi
+	# git-format-patch: switch `v' expects a numerical value
+	ver="${patchset[$P_VERS]:-1}"
+	[ -n "${ver##*[!0-9]*}" ] || ver="${ver%%[!0-9]*}"
 
 	outdir="${outdir:-patches/${patchset[$P_NAME]}/}"
 
@@ -1046,6 +1070,10 @@ cmd_export()
 	git format-patch -v "$ver" --thread --minimal --cover-from-description=auto \
 		-o "$outdir" \
 		"$@" "$basecommit..${patchset[$P_HEAD]}"
+
+	local msgid
+	! msgid="$(set +f; get_thread_id_from_files "$outdir/v$ver"-000[01]-*.patch)" ||
+		git config "branch.${patchset[$P_FULL]}.message-id-export" "$msgid"
 }
 
 help_send()
@@ -1066,7 +1094,7 @@ help_send()
 
 cmd_send()
 {
-	local args patchset
+	local args patchset ver msgid=''
 
 	args=()
 
@@ -1102,9 +1130,82 @@ cmd_send()
 		set -- "$workdir/export"
 
 		cmd_export "${patchset[$P_FULL]}" -o "$1" >/dev/null
+
+		ver="${patchset[$P_VERS]:-1}"
+		[ -n "${ver##*[!0-9]*}" ] || ver="${ver%%[!0-9]*}"
+
+		msgid="$(set +f; get_thread_id_from_files "$1/v$ver"-000[01]-*.patch)" ||:
 	fi
 
-	git send-email --to=' ' --confirm=always --format-patch --suppress-from "$@"
+	echo git send-email --to=' ' --confirm=always --format-patch --suppress-from "$@" ||
+		fatal "sending the patchset failed."
+
+	[ -z "$msgid" ] ||
+		git config "branch.${patchset[$P_FULL]}.message-id-sent" "$msgid"
+}
+
+help_discussion()
+{
+	case "$1" in
+		usage) printf 'discussion [--outdir=DIR] [<patchset>]\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Download a thread as an mbox file from a public-inbox server.
+			This subcommand requires the b4(1) utility to work.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  -o, --outdir=DIR   output into this directory.
+			  -h, --help         show this text and exit.
+			EOF
+			;;
+	esac
+}
+
+cmd_discussion()
+{
+	local args outdir='' msgid=''
+
+	args=()
+
+	while [ "$#" != 0 ]; do
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help discussion
+			return
+		elif option_s '-o --outdir' "$@"; then
+			outdir="$OUTVALUE"
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
+	done
+	set -- "${args[@]}" "$@"
+
+	type -p b4 >/dev/null ||
+		fatal "the b4 utility is required to fetch mbox."
+
+	parse_refname patchset "${1-}"
+	[ "$#" -eq 0 ] || shift
+
+	for n in "sent" "export"; do
+		! msgid="$(git config "branch.${patchset[$P_FULL]}.message-id-$n" 2>/dev/null)" ||
+			break
+	done
+
+	if [ -z "$msgid" ]; then
+		message "The message-id of the sent/exported patchset is not known."
+		message "It doesn't look like this patchset has been submitted."
+		return 1
+	fi
+
+	b4 mbox ${output:+-o "$outdir"} "$@" "$msgid"
 }
 
 help_archive()
@@ -1229,7 +1330,7 @@ help_()
 			for n in "${commands[@]}"; do
 				"help_$n" descr |
 				while read -r s; do
-					printf "%-10s%s\n" "$n" "$s"
+					printf "%-12s%s\n" "$n" "$s"
 					n=
 				done
 				printf '\n'
@@ -1281,6 +1382,7 @@ case "$cmd" in
 	-h|help)	cmd_help	"$@"	;;
 	ar|archive)	cmd_archive	"$@"	;;
 	cr|create)	cmd_create	"$@"	;;
+	di|discussion)	cmd_discussion	"$@"	;;
 	ex|export)	cmd_export	"$@"	;;
 	ls|list)	cmd_list	"$@"	;;
 	vr|version)	cmd_version	"$@"	;;
