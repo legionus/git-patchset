@@ -649,7 +649,7 @@ help_list()
 
 cmd_list()
 {
-	local mode='' ver=v show_current='' patchset
+	local mode='latest' ver=v show_current='' patchset
 
 	while [ "$#" != 0 ]; do
 		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
@@ -662,7 +662,6 @@ cmd_list()
 		elif option_b '--all --latest --versions' "$@"; then
 			mode="${OPTNAME#--}"
 		elif option_b '--archive' "$@"; then
-			mode="${mode:-latest}"
 			ver=a
 		elif option_b '--current' "$@"; then
 			show_current=1
@@ -671,8 +670,6 @@ cmd_list()
 		fi
 		shift $OPTSHIFT
 	done
-
-	mode="${mode:-all}"
 
 	local ColorRange='' ColorReset='' ColorCurrent='' ColorDefault=''
 
