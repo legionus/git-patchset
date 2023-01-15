@@ -346,6 +346,81 @@ cmd_create()
 	message "new patchset created: patchset/$branchname/$newver"
 }
 
+help_remove()
+{
+	case "$1" in
+		usage) printf 'remove <patchset>\n'
+			;;
+		descr) builtin_cat <<-EOF
+			Permanently remove patchset version.
+			EOF
+			;;
+		options) builtin_cat <<-EOF
+
+			Options:
+			  -a, --all       remove all patchset versions.
+			  -h, --help      show this text and exit.
+			EOF
+			;;
+	esac
+}
+
+cmd_remove()
+{
+	local args patchset current remove_all='' cant_remove=''
+
+	args=()
+
+	while [ "$#" != 0 ]; do
+		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
+		if [ "$1" = '--' ]; then
+			shift
+			break
+		elif option_b '-h --help' "$@"; then
+			cmd_help remove
+			return
+		elif option_b '-a --all' "$@"; then
+			remove_all=1
+		else
+			args+=("$1")
+			OPTSHIFT=1
+		fi
+		shift $OPTSHIFT
+	done
+	set -- "${args[@]}" "$@"
+
+	parse_refname patchset "$1"
+	shift
+
+	[ "$#" -eq 0 ] ||
+		fatal "too many arguments"
+
+	parse_refname current
+
+	local filter=''
+
+	if [ -n "$remove_all" ]; then
+		[ "${current[$P_NAME]}" != "${patchset[$P_NAME]}" ] ||
+			cant_remove=1
+		filter="patchset/${patchset[$P_NAME]}/"
+	elif [ "${current[$P_FULL]}" = "${patchset[$P_FULL]}" ]; then
+		cant_remove=1
+	else
+		filter="${patchset[$P_FULL]}"
+	fi
+
+	[ -z "$cant_remove" ] ||
+		fatal "cowardly refuse to delete the current branch."
+
+	git for-each-ref --format='%(refname:lstrip=2)' "refs/heads/$filter" |
+		sort -V |
+	while read -r branchname; do
+		message "removing \`$branchname' ..."
+		git tag -d "$branchname/cover" 2>/dev/null ||:
+		git branch -D "$branchname"
+	done
+}
+
 list_recipients()
 {
 	local arr i handler data
@@ -1385,6 +1460,7 @@ case "$cmd" in
 	di|discussion)	cmd_discussion	"$@"	;;
 	ex|export)	cmd_export	"$@"	;;
 	ls|list)	cmd_list	"$@"	;;
+	rm|remove)	cmd_remove	"$@"	;;
 	vr|version)	cmd_version	"$@"	;;
 	config|cover|log|send)
 			cmd_"$cmd"	"$@"	;;
