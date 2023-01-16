@@ -828,7 +828,7 @@ cmd_list()
 					tags+=("sent")
 			fi
 
-			printf '%1s %s..%s %7s %s%s%s%s\n' \
+			printf '%1s %s..%s %7s %s%s%s\n' \
 				"${current}${ColorDefault}${mark}" \
 				"${ColorRange}${basecommit}" \
 				"${objectname}${ColorDefault}" \
