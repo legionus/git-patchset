@@ -607,8 +607,11 @@ cmd_config()
 	parse_refname patchset "${1-}"
 	[ "$#" -eq 0 ] || shift
 
-	[ "$#" -eq 0 ] ||
+	if [ "$#" -eq 0 ]; then
+		[ -n "$do_edit" ] || message "nothing to do"
+	else
 		fatal "too many arguments"
+	fi
 
 	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
