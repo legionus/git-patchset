@@ -305,10 +305,8 @@ cmd_create()
 		'---'
 
 	if [ -s "$mbox" ]; then
-		if ! type -p b4 >/dev/null; then
-			errmsg="the b4 utility is required to import mbox"
-			break
-		fi
+		type -p b4 >/dev/null ||
+			fatal "the b4 utility is required to import mbox"
 
 		b4 -q am -o "$workdir" -m "$mbox" ||
 			fatal "unable to create an mbox file that is ready to git-am"
