@@ -172,6 +172,16 @@ basecommit_for()
 	eval "$1=\"\$__basecommit_for\""
 }
 
+foreach_ref()
+{
+	git for-each-ref --format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' "refs/heads/$1" |
+		sort -V -t\  -k3,3 |
+	while [ -z "${eof-}" ]; do
+		read -r _0 _1 _2 || eof=1
+		"$2" "${_0}" "${_1}" "${_2}" "${_2%/[av]*}" || break
+	done
+}
+
 get_subject_prefix()
 {
 	git config --get "branch.$1.subject-prefix" |
@@ -412,13 +422,16 @@ cmd_remove()
 	[ -z "$cant_remove" ] ||
 		fatal "cowardly refuse to delete the current branch."
 
-	git for-each-ref --format='%(refname:lstrip=2)' "refs/heads/$filter" |
-		sort -V |
-	while read -r branchname; do
-		message "removing \`$branchname' ..."
-		git tag -d "$branchname/cover" 2>/dev/null ||:
-		git branch -D "$branchname"
-	done
+	_()
+	{
+		local mark="$1" objectname="$2" branchname="$3" cur_patchset="$4"
+		if [ -n "$branchname" ]; then
+			message "removing \`$branchname' ($objectname) ..."
+			git tag -d "$branchname/cover" 2>/dev/null ||:
+			git branch -D "$branchname"
+		fi
+	}
+	foreach_ref "$filter" _
 }
 
 list_recipients()
@@ -734,7 +747,7 @@ help_list()
 
 cmd_list()
 {
-	local mode='latest' ver=v show_current='' no_tags='' patchset
+	local mode='latest' ver=v no_tags='' patchset
 
 	while [ "$#" != 0 ]; do
 		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
@@ -750,8 +763,6 @@ cmd_list()
 			mode="${OPTNAME#--}"
 		elif option_b '--archive' "$@"; then
 			ver=a
-		elif option_b '--current' "$@"; then
-			show_current=1
 		else
 			break
 		fi
@@ -784,31 +795,26 @@ cmd_list()
 	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
 
+	_()
 	{
-		git for-each-ref \
-			--format='%(if)%(HEAD)%(then)*%(else)-%(end) %(objectname:short) %(refname:lstrip=2)' \
-			"refs/heads/patchset/${patchset[$P_NAME]}/$ver[0-9]*" |
-			sort -V -t\  -k3,3
-		printf '\n'
-	} |
-	while read -r on_mark on_objectname on_branchname; do
-		on_patchset="${on_branchname%/$ver*}"
+		local mark="$1" objectname="$2" branchname="$3" cur_patchset="$4"
 
-		while [ -n "${branchname-}" ]; do
-			case "$mode" in
-				all|versions)
-					;;
-				latest)
-					if [ -n "$show_current" ] && [ "$branchname" = "${patchset[$P_FULL]-}" ]; then
-						:;
-					elif [ "${prev_patchset:-$on_patchset}" = "$on_patchset" ]; then
-						break
-					fi
-					;;
-			esac
+		case "$mode" in
+			all|versions)
+				;;
+			latest)
+				if [ "${prev[3]-}" = "$cur_patchset" ] || [ -z "${prev[0]-}" ]; then
+					prev=("$@")
+					return 0
+				fi
+				;;
+		esac
+
+		if [ -n "${prev[0]-}" ]; then
+			mark="${prev[0]}" objectname="${prev[1]}" branchname="${prev[2]}" cur_patchset="${prev[3]}"
 
 			basecommit_for basecommit "$branchname" ||
-				break
+				return 0
 
 			[ "$mark" = '*' ] &&
 				current="$ColorCurrent" ||
@@ -832,14 +838,11 @@ cmd_list()
 				"${branchname}" \
 				"${tags:+ ${ColorTag}[${tags[*]}]${ColorDefault}}" \
 				"${ColorReset}"
-			break
-		done
+		fi
 
-		mark="$on_mark"
-		objectname="$on_objectname"
-		branchname="$on_branchname"
-		prev_patchset="$on_patchset"
-	done
+		prev=("$@")
+	}
+	foreach_ref "patchset/${patchset[$P_NAME]}/$ver[0-9]*" _
 }
 
 help_version()
@@ -1345,27 +1348,30 @@ cmd_archive()
 	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
 
-	[ -z "${patchset[$P_VERS]}" ] ||
-		message "WARNING: You have specified the version number but the entire patchset will be archived"
+	if [ -n "${patchset[$P_VERS]}" ]; then
+		local word="archived"
+		[ "$new" = a ] || word="restored"
+		message "WARNING: You have specified the version number but the entire patchset will be $word"
+	fi
 
-	git for-each-ref --format='%(refname:lstrip=2)' \
-		"refs/heads/patchset/${patchset[$P_NAME]}/$ver[0-9]*" |
-	while :; do
-		read -r name ||:
+	_()
+	{
+		local mark="$1" objectname="$2" branchname="$3" cur_patchset="$4"
 
-		if [ -z "$name" ]; then
+		if [ -z "$branchname" ]; then
 			[ -n "${found-}" ] ||
 				message "patchset/${patchset[$P_NAME]}: patchset not found."
-			break
+			return 0
 		fi
 
-		num="${name##*/[av]}"
+		num="${branchname##*/[av]}"
 
-		git branch -M "$name" "patchset/${patchset[$P_NAME]}/$new$num"
+		git branch -M "$branchname" "patchset/${patchset[$P_NAME]}/$new$num"
 
 		message "patchset/${patchset[$P_NAME]}/$ver$num -> patchset/../$new$num"
 		found=1
-	done
+	}
+	foreach_ref "patchset/${patchset[$P_NAME]}/$ver[0-9]*" _
 }
 
 help_help()
@@ -1447,7 +1453,7 @@ cmd_help()
 	EOF
 }
 
-[ "$#" != 0 ] || set -- list --latest --current
+[ "$#" != 0 ] || set -- list --latest
 cmd="$1"; shift
 
 trap exit_handler EXIT
