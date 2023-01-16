@@ -271,7 +271,7 @@ cmd_create()
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}"
 
@@ -393,7 +393,7 @@ cmd_remove()
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}" "$@"
 
@@ -446,7 +446,7 @@ list_recipients()
 				recipients+=("$i")
 				arr+=("$i")
 			fi
-		done <<< $(git config --get-all "$1" ||:;)
+		done < <(git config --get-all "$1" ||:;)
 		shift
 	done
 
@@ -600,7 +600,7 @@ cmd_config()
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}" "$@"
 
@@ -622,14 +622,14 @@ cmd_config()
 
 	if [ "${#to[@]}" != 0 ] || [ "${#cc[@]}" != 0 ]; then
 		arr=()
-		readarray -t arr <<< $(
-			git config --get-all patchset.to ||:;
-			git config --get-all patchset.cc ||:;
+		readarray -t arr < <(
+			git config --get-all "patchset.to" ||:;
+			git config --get-all "patchset.cc" ||:;
 		)
 		if [ -z "$cfg_prefix" ]; then
-			readarray -O "${#arr[@]}" -t arr <<< $(
-				git config --get-all branch.${patchset[$P_FULL]}.to ||:;
-				git config --get-all branch.${patchset[$P_FULL]}.cc ||:;
+			readarray -O "${#arr[@]}" -t arr < <(
+				git config --get-all "branch.${patchset[$P_FULL]}.to" ||:;
+				git config --get-all "branch.${patchset[$P_FULL]}.cc" ||:;
 			)
 			cfg_prefix="branch.${patchset[$P_FULL]}"
 		fi
@@ -656,6 +656,7 @@ cmd_config()
 	local tag_nr=0
 
 	if [ "${#tags[@]}" != 0 ]; then
+		# shellcheck disable=SC2207
 		arr=( $(git config --get "branch.${patchset[$P_FULL]}.subject-prefix") )
 
 		for a in "${tags[@]}"; do
@@ -764,7 +765,7 @@ cmd_list()
 		else
 			break
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 
 	local ColorRange='' ColorReset='' ColorCurrent='' ColorDefault='' ColorTag=''
@@ -840,7 +841,7 @@ cmd_list()
 
 		prev=("$@")
 	}
-	foreach_ref "patchset/${patchset[$P_NAME]}/$ver[0-9]*" _
+	foreach_ref "patchset/${patchset[$P_NAME]}/${ver}[0-9]*" _
 }
 
 help_version()
@@ -881,7 +882,7 @@ cmd_version()
 		else
 			break
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 
 	parse_refname patchset "${1-}"
@@ -973,7 +974,7 @@ cmd_cover()
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}" "$@"
 
@@ -1037,7 +1038,7 @@ cmd_log()
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}"
 
@@ -1102,7 +1103,7 @@ cmd_export()
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}" "$@"
 
@@ -1186,7 +1187,7 @@ cmd_send()
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}"
 
@@ -1255,12 +1256,12 @@ cmd_discussion()
 			cmd_help discussion
 			return
 		elif option_s '-o --outdir' "$@"; then
-			outdir="$OUTVALUE"
+			outdir="$OPTVALUE"
 		else
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}" "$@"
 
@@ -1327,7 +1328,7 @@ cmd_archive()
 			args+=("$1")
 			OPTSHIFT=1
 		fi
-		shift $OPTSHIFT
+		shift "$OPTSHIFT"
 	done
 	set -- "${args[@]}" "$@"
 
@@ -1369,7 +1370,7 @@ cmd_archive()
 		message "patchset/${patchset[$P_NAME]}/$ver$num -> patchset/../$new$num"
 		found=1
 	}
-	foreach_ref "patchset/${patchset[$P_NAME]}/$ver[0-9]*" _
+	foreach_ref "patchset/${patchset[$P_NAME]}/${ver}[0-9]*" _
 }
 
 help_help()
@@ -1386,7 +1387,8 @@ help_help()
 	esac
 }
 
-commands=(`sed -n -e 's/^help_\([^[:space:]]\+\)().*/\1/p' "$0"`)
+commands=()
+readarray -t commands < <(sed -n -e 's/^help_\([^[:space:]]\+\)().*/\1/p' "$0")
 help_()
 {
 	local n s
@@ -1441,10 +1443,10 @@ cmd_help()
 	done
 	builtin_cat <<-EOF
 
-	`
+	$(
 	"help_$cmd" descr
 	"help_$cmd" options
-	`
+	)
 
 	Report bugs to authors.
 

@@ -2,6 +2,9 @@ TESTS = $(wildcard tests/*-ts)
 
 .PHONY: $(TESTS)
 
+verify:
+	@shellcheck -e SC2004,SC2015,SC2295 git-patchset
+
 check: $(TESTS)
 	@echo tests/*.output | grep -qs ^
 
