@@ -815,8 +815,10 @@ cmd_list()
 		if [ -n "${prev[0]-}" ]; then
 			mark="${prev[0]}" objectname="${prev[1]}" branchname="${prev[2]}" cur_patchset="${prev[3]}"
 
-			basecommit_for basecommit "$branchname" ||
+			if ! basecommit_for basecommit "$branchname"; then
+				prev=("$@")
 				return 0
+			fi
 
 			[ "$mark" = '*' ] &&
 				current="$ColorCurrent" ||
