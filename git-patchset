@@ -146,17 +146,10 @@ mergecommit_for()
 			return 1
 		fi
 
-		case "$remote" in
-			'.')
-				;;
-			*)
-				merge="${merge#refs/}"
-				merge="${merge#heads/}"
-				merge="refs/remotes/$remote/$merge"
-				;;
-		esac
+		[ "$remote" = '.' ] || ! [[ "$merge" =~ ^(refs/)?(heads/)?(.*) ]] ||
+			merge="refs/remotes/$remote/${BASH_REMATCH[3]}"
 
-		__mergecommit_for="$(git rev-parse --short "$merge")" || {
+		__mergecommit_for="$(git rev-parse --verify "$merge")" || {
 			message "unable to resolve reference: $merge"
 			return 1
 		}
@@ -176,7 +169,7 @@ basecommit_for()
 		name="${1#refs/}"
 		name="${name#heads/}"
 
-		if merge="$(git rev-parse --short "refs/tags/$name/cover" 2>/dev/null)"; then
+		if merge="$(git rev-parse --verify "refs/tags/$name/cover" 2>/dev/null)"; then
 			__basecommit_for="$merge"
 			return
 		fi
@@ -207,7 +200,7 @@ get_subject_prefix()
 
 update_description_from_tag()
 {
-	git rev-parse --short "refs/tags/$1/cover" &>/dev/null ||
+	git rev-parse --verify "refs/tags/$1/cover" &>/dev/null ||
 		return 0
 
 	create_workdir
@@ -873,7 +866,7 @@ cmd_list()
 
 			printf '%1s %s..%s %7s %s%s%s\n' \
 				"${current}${ColorDefault}${mark}" \
-				"${ColorRange}${basecommit}" \
+				"${ColorRange}${basecommit:0:${#objectname}}" \
 				"${objectname}${ColorDefault}" \
 				"($(git rev-list --count "$basecommit..$objectname"))" \
 				"${branchname}" \
