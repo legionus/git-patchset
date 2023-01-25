@@ -125,20 +125,15 @@ get_pager()
 	eval "$1=\"\$__get_pager\""
 }
 
-basecommit_for()
+mergecommit_for()
 {
-	local __basecommit_for=''
-	__basecommit_for()
+	local __mergecommit_for=''
+	__mergecommit_for()
 	{
 		local name merge remote
 
 		name="${1#refs/}"
 		name="${name#heads/}"
-
-		if merge="$(git rev-parse --short "refs/tags/$name/cover" 2>/dev/null)"; then
-			__basecommit_for="$merge"
-			return
-		fi
 
 		if ! merge="$(git config "branch.$name.merge")"; then
 			message "not found upstream for branch: $name"
@@ -161,10 +156,32 @@ basecommit_for()
 				;;
 		esac
 
-		__basecommit_for="$(git rev-parse --short "$merge")" || {
+		__mergecommit_for="$(git rev-parse --short "$merge")" || {
 			message "unable to resolve reference: $merge"
 			return 1
 		}
+	}
+	__mergecommit_for "$2" ||
+		return
+	eval "$1=\"\$__mergecommit_for\""
+}
+
+basecommit_for()
+{
+	local __basecommit_for=''
+	__basecommit_for()
+	{
+		local name merge
+
+		name="${1#refs/}"
+		name="${name#heads/}"
+
+		if merge="$(git rev-parse --short "refs/tags/$name/cover" 2>/dev/null)"; then
+			__basecommit_for="$merge"
+			return
+		fi
+
+		mergecommit_for __basecommit_for "$1"
 	}
 
 	__basecommit_for "$2" ||
@@ -207,8 +224,8 @@ update_tag_from_description()
 {
 	local commit
 
-	commit="$(git config "branch.$1.merge")"     || return 0
-	commit="$(git rev-parse --verify "$commit")" || return 0
+	mergecommit_for commit "$1" ||
+		return 0
 
 	git config "branch.$1.description" |
 		git tag --annotate --file=- --force "$1/cover" "$commit"
@@ -219,8 +236,8 @@ update_tag()
 	local merge tag
 
 	if tag="$(git rev-parse --verify "refs/tags/$1/cover^{}" 2>/dev/null)"; then
-		merge="$(git config "branch.$1.merge")"    || return 0
-		merge="$(git rev-parse --verify "$merge")" || return 0
+		mergecommit_for merge "$1" ||
+			return 0
 
 		[ "$tag" != "$merge" ] ||
 			return 0
