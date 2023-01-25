@@ -214,6 +214,23 @@ update_tag_from_description()
 		git tag --annotate --file=- --force "$1/cover" "$commit"
 }
 
+update_tag()
+{
+	local merge tag
+
+	if tag="$(git rev-parse --verify "refs/tags/$1/cover^{}" 2>/dev/null)"; then
+		merge="$(git config "branch.$1.merge")"    || return 0
+		merge="$(git rev-parse --verify "$merge")" || return 0
+
+		[ "$tag" != "$merge" ] ||
+			return 0
+
+		message "it looks like the branch tag doesn't point to the beginning of patchset (rebase happened ?)"
+	fi
+
+	update_tag_from_description "$1"
+}
+
 get_thread_id_from_files()
 {
 	if [ -s "$1" ]; then
@@ -607,11 +624,8 @@ cmd_config()
 	parse_refname patchset "${1-}"
 	[ "$#" -eq 0 ] || shift
 
-	if [ "$#" -eq 0 ]; then
-		[ -n "$do_edit" ] || message "nothing to do"
-	else
+	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
-	fi
 
 	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
@@ -677,8 +691,12 @@ cmd_config()
 	[ "${#cc[@]}"   = 0 ] || message "added $cc_nr new addresses to \`Cc' list"
 	[ "${#tags[@]}" = 0 ] || message "added $tag_nr new tags to subject prefix"
 
-	[ -n "$do_edit" ] ||
+	if [ -z "$do_edit" ]; then
+		update_tag "${patchset[$P_FULL]}"
+		[ "$#" -ne 0 ] ||
+			message "there's nothing else to do"
 		return 0
+	fi
 
 	local git_dir rc=0
 
@@ -720,6 +738,8 @@ EOF
 
 	[ "$rc" = 0 ] ||
 		return $rc
+
+	update_tag "${patchset[$P_FULL]}"
 }
 
 help_list()
