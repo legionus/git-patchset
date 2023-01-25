@@ -1433,7 +1433,7 @@ commands=()
 readarray -t commands < <(sed -n -e 's/^help_\([^[:space:]]\+\)().*/\1/p' "$0")
 help_()
 {
-	local n s
+	local n s len=0
 	case "$1" in
 		usage) printf '[<command>] [<args>]\n'
 			for n in "${commands[@]}"; do
@@ -1450,10 +1450,16 @@ help_()
 			Commands:
 
 			EOF
+
+			for n in "${commands[@]}"; do
+				[ $len -ge ${#n} ] || len=${#n}
+			done
+			len=$(( $len + 4 ))
+
 			for n in "${commands[@]}"; do
 				"help_$n" descr |
 				while read -r s; do
-					printf "%-12s%s\n" "$n" "$s"
+					printf "%-${len}s%s\n" "$n" "$s"
 					n=
 				done
 				printf '\n'
