@@ -275,7 +275,7 @@ help_create()
 			  -S, --start-point=COMMIT    specifying a COMMIT allows you to create a branch
 			                              based on some other point in history than where
 			                              HEAD currently points.
-			  -m, --use-local-mbox=FILE   process FILE mbox to import patchset.
+			  -m, --from-mbox=FILE        process FILE mbox to import patchset.
 			  -h, --help                  show this text and exit.
 			EOF
 			;;
@@ -299,7 +299,7 @@ cmd_create()
 			no_edit_cover=1
 		elif option_s '-S --start-point' "$@"; then
 			startpoint="$OPTVALUE"
-		elif option_s '-m --use-local-mbox' "$@"; then
+		elif option_s '-m --from-mbox' "$@"; then
 			mbox="$OPTVALUE"
 		else
 			args+=("$1")
