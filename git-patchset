@@ -674,7 +674,7 @@ cmd_config()
 
 	if [ "${#tags[@]}" != 0 ]; then
 		# shellcheck disable=SC2207
-		arr=( $(git config --get "branch.${patchset[$P_FULL]}.subject-prefix") )
+		arr=( $(git config --get "branch.${patchset[$P_FULL]}.subject-prefix" ||:) )
 
 		for a in "${tags[@]}"; do
 			if in_array "$a" "${arr[@]}"; then
@@ -693,7 +693,7 @@ cmd_config()
 
 	if [ -z "$do_edit" ]; then
 		update_tag "${patchset[$P_FULL]}"
-		[ "$#" -ne 0 ] ||
+		[ "$#" -ne 0 ] || [ $(( ${#to[@]} + ${#cc[@]} + ${#tags[@]} )) -gt 0 ] ||
 			message "there's nothing else to do"
 		return 0
 	fi
