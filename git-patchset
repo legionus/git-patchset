@@ -1239,7 +1239,7 @@ cmd_send()
 		msgid="$(set +f; get_thread_id_from_files "$1/v$ver"-000[01]-*.patch)" ||:
 	fi
 
-	echo git send-email --to=' ' --confirm=always --format-patch --suppress-from "$@" ||
+	git send-email --to=' ' --confirm=always --format-patch --suppress-from "$@" ||
 		fatal "sending the patchset failed."
 
 	[ -z "$msgid" ] ||
