@@ -146,8 +146,29 @@ mergecommit_for()
 			return 1
 		fi
 
-		[ "$remote" = '.' ] || ! [[ "$merge" =~ ^(refs/)?(heads/)?(.*) ]] ||
-			merge="refs/remotes/$remote/${BASH_REMATCH[3]}"
+		if [ "$remote" != '.' ]; then
+			merge_name=
+			! [[ "$merge" =~ ^(refs/)?(heads/)?(.*) ]] ||
+				merge_name="${BASH_REMATCH[3]}"
+
+			if [ "$name" = "$merge_name" ]; then
+				# Someone pushed this patchset with --set-upstream
+				# and replaced remote= and merge= parameters.
+				# In this case, we can only rely on the tag.
+
+				if tag="$(git rev-parse --verify "refs/tags/$name/cover^{}" 2>/dev/null)"; then
+					__mergecommit_for="$tag"
+					return
+				fi
+
+				message "it looks like '$name' has been pushed with --set-upstream option."
+				message "This overwrote the remote= and merge= parameters and couldn't find"
+				message "the patchset tag."
+				return 1
+			fi
+
+			merge="refs/remotes/$remote/$merge_name"
+		fi
 
 		__mergecommit_for="$(git rev-parse --verify "$merge")" || {
 			message "unable to resolve reference: $merge"
