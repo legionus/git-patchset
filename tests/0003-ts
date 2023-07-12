@@ -40,7 +40,7 @@ echo "### new major version (2)"
 "$bin"/git-patchset version --major
 
 echo "### list of patchsets"
-"$bin"/git-patchset list |
+"$bin"/git-patchset list --versions |
 	sed -r -e 's/ [0-9a-f]+\.\.[0-9a-f]+ / aaaaaaa..bbbbbbb /'
 
 echo "### list of branches"

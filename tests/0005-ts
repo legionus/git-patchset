@@ -52,7 +52,7 @@ echo "### default list"
 	sed -r -e 's/ [0-9a-f]+\.\.[0-9a-f]+ / aaaaaaa..bbbbbbb /'
 
 echo "### list of patchsets"
-"$bin"/git-patchset list |
+"$bin"/git-patchset list --all |
 	sed -r -e 's/ [0-9a-f]+\.\.[0-9a-f]+ / aaaaaaa..bbbbbbb /'
 
 echo "### list of latest patchsets"
