@@ -1473,7 +1473,7 @@ help_()
 			EOF
 
 			for n in "${commands[@]}"; do
-				[ $len -ge ${#n} ] || len=${#n}
+				[ "$len" -ge "${#n}" ] || len=${#n}
 			done
 			len=$(( $len + 4 ))
 
