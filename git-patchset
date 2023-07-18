@@ -125,6 +125,12 @@ get_pager()
 	eval "$1=\"\$__get_pager\""
 }
 
+patchset_tag()
+{
+	_="$(git rev-parse --verify "refs/tags/$2/cover^{}" 2>/dev/null)" || return 1
+	eval "$1=\"\$_\""
+}
+
 mergecommit_for()
 {
 	local __mergecommit_for=''
@@ -156,7 +162,7 @@ mergecommit_for()
 				# and replaced remote= and merge= parameters.
 				# In this case, we can only rely on the tag.
 
-				if tag="$(git rev-parse --verify "refs/tags/$name/cover^{}" 2>/dev/null)"; then
+				if patchset_tag tag "$name"; then
 					__mergecommit_for="$tag"
 					return
 				fi
@@ -185,13 +191,13 @@ basecommit_for()
 	local __basecommit_for=''
 	__basecommit_for()
 	{
-		local name merge
+		local name
 
 		name="${1#refs/}"
 		name="${name#heads/}"
 
-		if merge="$(git rev-parse --verify "refs/tags/$name/cover" 2>/dev/null)"; then
-			__basecommit_for="$merge"
+		if patchset_tag _ "$name"; then
+			__basecommit_for="refs/tags/$name/cover"
 			return
 		fi
 
@@ -221,7 +227,7 @@ get_subject_prefix()
 
 update_description_from_tag()
 {
-	git rev-parse --verify "refs/tags/$1/cover" &>/dev/null ||
+	patchset_tag _ "$1" ||
 		return 0
 
 	create_workdir
@@ -249,7 +255,7 @@ update_tag()
 {
 	local merge tag
 
-	if [ -z "${2-}" ] && tag="$(git rev-parse --verify "refs/tags/$1/cover^{}" 2>/dev/null)"; then
+	if [ -z "${2-}" ] && patchset_tag tag "$1"; then
 		mergecommit_for merge "$1" ||
 			return 0
 
