@@ -671,8 +671,10 @@ cmd_config()
 	[ -n "${patchset[$P_NAME]}" ] && [ -n "${patchset[$P_VERS]}" ] ||
 		fatal "unable to parse patchset"
 
-	[ -z "$cover_tag" ] ||
+	if [ -n "$cover_tag" ]; then
 		update_tag "${patchset[$P_FULL]}" "$cover_tag"
+		return
+	fi
 
 	if [ -n "$cfg_prefix" ]; then
 		[ "$mode" != 'edit' ] ||
@@ -1435,6 +1437,11 @@ cmd_archive()
 		num="${branchname##*/[av]}"
 
 		git branch -M "$branchname" "patchset/${patchset[$P_NAME]}/$new$num"
+
+		if patchset_tag tag "patchset/${patchset[$P_NAME]}/$ver$num"; then
+			update_tag_from_description "patchset/${patchset[$P_NAME]}/$new$num" "$tag"
+			git tag -d "patchset/${patchset[$P_NAME]}/$ver$num"
+		fi
 
 		message "patchset/${patchset[$P_NAME]}/$ver$num -> patchset/../$new$num"
 		found=1
