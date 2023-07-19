@@ -1,0 +1,23 @@
+### (1) init
+### (1) creating foo
+Switched to a new branch 'patchset/foo/v1.0'
+Branch 'patchset/foo/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/foo/v1.0
+* aaaaaaa..bbbbbbb     (3) patchset/foo/v1.0
+git-patchset: patchset/foo/v1.0 -> patchset/../a1.0
+* aaaaaaa..bbbbbbb     (3) patchset/foo/a1.0
+### (1) done
+### (2) init
+### (2) creating foo
+Switched to a new branch 'patchset/foo/v1.0'
+Branch 'patchset/foo/v1.0' set up to track local branch 'master'.
+git-patchset: new patchset created: patchset/foo/v1.0
+config.<name>.remote : .
+config.<name>.merge  : refs/heads/master
+### (2) set upstream
+config.<name>.remote : myremote
+config.<name>.merge  : refs/heads/patchset/foo/v1.0
+* aaaaaaa..bbbbbbb     (3) patchset/foo/v1.0
+git-patchset: patchset/foo/v1.0 -> patchset/../a1.0
+* aaaaaaa..bbbbbbb     (3) patchset/foo/a1.0
+### (2) done

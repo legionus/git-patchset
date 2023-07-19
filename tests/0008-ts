@@ -1,0 +1,94 @@
+#!/bin/bash -efu
+
+cwd="$(readlink -ev "$0")"
+cwd="${cwd%/*}"
+bin="$cwd/.."
+
+count=1
+prepare()
+{
+	echo "### ($count) init"
+	touch somefile
+
+	git init --quiet -b master
+	git add somefile
+	git commit -q -m 'first commit'
+
+	echo "### ($count) creating foo"
+	"$bin"/git-patchset create --no-edit-cover foo
+
+	echo aaa >> somefile
+	git add somefile
+	git commit -q -m 'Useful change aaa'
+
+	echo bbb >> somefile
+	git add somefile
+	git commit -q -m 'Useful change bbb'
+
+	echo ccc >> somefile
+	git add somefile
+	git commit -q -m 'Useful change ccc'
+}
+
+destroy()
+{
+	echo "### ($count) done"
+	rm -rf -- .git somefile
+	count=$(( $count + 1 ))
+}
+
+workdir=
+exit_handler()
+{
+	trap - EXIT
+	[ -z "$workdir" ] ||
+		rm -rf -- "$workdir" ||:
+	exit "$1"
+}
+
+trap 'exit_handler $?' HUP PIPE INT QUIT TERM EXIT
+workdir=$(mktemp -d -t ts.XXXXXX)
+cd "$workdir"
+
+prepare
+
+"$bin"/git-patchset list --all |
+	sed -r -e 's/ [0-9a-f]+\.\.[0-9a-f]+ / aaaaaaa..bbbbbbb /'
+
+"$bin"/git-patchset archive --add patchset/foo
+
+"$bin"/git-patchset list --all --archive |
+	sed -r -e 's/ [0-9a-f]+\.\.[0-9a-f]+ / aaaaaaa..bbbbbbb /'
+
+destroy
+
+mkdir -- remote
+cd remote
+git init --quiet --bare -b master
+cd - >/dev/null
+
+prepare
+
+echo -n "config.<name>.remote : "
+git config "branch.patchset/foo/v1.0.remote"
+echo -n "config.<name>.merge  : "
+git config "branch.patchset/foo/v1.0.merge"
+
+echo "### ($count) set upstream"
+git remote add myremote "file://$PWD/remote"
+git push -q --set-upstream myremote
+
+echo -n "config.<name>.remote : "
+git config "branch.patchset/foo/v1.0.remote"
+echo -n "config.<name>.merge  : "
+git config "branch.patchset/foo/v1.0.merge"
+
+"$bin"/git-patchset list --all |
+	sed -r -e 's/ [0-9a-f]+\.\.[0-9a-f]+ / aaaaaaa..bbbbbbb /'
+
+"$bin"/git-patchset archive --add patchset/foo
+
+"$bin"/git-patchset list --all --archive |
+	sed -r -e 's/ [0-9a-f]+\.\.[0-9a-f]+ / aaaaaaa..bbbbbbb /'
+
+destroy
