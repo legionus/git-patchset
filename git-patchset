@@ -397,22 +397,27 @@ cmd_remove()
 	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
 
-	parse_refname current
+	local filter='' curbranch
 
-	local filter=''
+	curbranch="$(git branch --show-current --format='%(refname)')"
 
-	if [ -n "$remove_all" ]; then
-		[ "${current[$P_NAME]}" != "${patchset[$P_NAME]}" ] ||
+	if [ -n "$curbranch" ] && [ -z "${curbranch##patchset/*}" ]; then
+		parse_refname current
+
+		if [ -n "$remove_all" ]; then
+			[ "${current[$P_NAME]}" != "${patchset[$P_NAME]}" ] ||
+				cant_remove=1
+		elif [ "${current[$P_FULL]}" = "${patchset[$P_FULL]}" ]; then
 			cant_remove=1
-		filter="patchset/${patchset[$P_NAME]}/"
-	elif [ "${current[$P_FULL]}" = "${patchset[$P_FULL]}" ]; then
-		cant_remove=1
-	else
-		filter="${patchset[$P_FULL]}"
+		fi
+
+		[ -z "$cant_remove" ] ||
+			fatal "cowardly refuse to delete the current branch."
 	fi
 
-	[ -z "$cant_remove" ] ||
-		fatal "cowardly refuse to delete the current branch."
+	[ -n "$remove_all" ] &&
+		filter="patchset/${patchset[$P_NAME]}/" ||
+		filter="${patchset[$P_FULL]}"
 
 	_()
 	{
