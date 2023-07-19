@@ -127,8 +127,8 @@ get_pager()
 
 patchset_tag()
 {
-	_="$(git rev-parse --verify "refs/tags/$2/cover^{}" 2>/dev/null)" || return 1
-	eval "$1=\"\$_\""
+	__="$(git rev-parse --verify "refs/tags/$2/cover^{}" 2>/dev/null)" || return 1
+	eval "$1=\"\$__\""
 }
 
 mergecommit_for()
@@ -196,12 +196,8 @@ basecommit_for()
 		name="${1#refs/}"
 		name="${name#heads/}"
 
-		if patchset_tag _ "$name"; then
-			__basecommit_for="refs/tags/$name/cover"
-			return
-		fi
-
-		mergecommit_for __basecommit_for "$1"
+		patchset_tag __basecommit_for "$name" ||
+		mergecommit_for __basecommit_for "$1" ||:
 	}
 
 	__basecommit_for "$2" ||
