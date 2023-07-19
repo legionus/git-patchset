@@ -197,8 +197,7 @@ update_tag()
 	local merge tag
 
 	if [ -z "${2-}" ] && patchset_tag tag "$1"; then
-		mergecommit_for merge "$1" ||
-			return 0
+		merge="$(git merge-base "$1" "$tag")"
 
 		[ "$tag" != "$merge" ] ||
 			return 0
