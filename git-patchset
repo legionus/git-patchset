@@ -1436,7 +1436,7 @@ cmd_archive()
 
 		if patchset_tag tag "patchset/${patchset[$P_NAME]}/$ver$num"; then
 			update_tag_from_description "patchset/${patchset[$P_NAME]}/$new$num" "$tag"
-			git tag -d "patchset/${patchset[$P_NAME]}/$ver$num"
+			git tag -d "patchset/${patchset[$P_NAME]}/$ver$num" 2>/dev/null ||:
 		fi
 
 		message "patchset/${patchset[$P_NAME]}/$ver$num -> patchset/../$new$num"
