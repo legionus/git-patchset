@@ -210,11 +210,8 @@ update_tag()
 
 get_thread_id_from_files()
 {
-	if [ -s "$1" ]; then
-		sed -ne '1,/^$/ { s/^Message-Id:[[:space:]]\+//p }' "$1"
-		return 0
-	fi
-	return 1
+	[ -s "$1" ] && sed -ne '1,/^$/ { s/^Message-Id:[[:space:]]\+//p }' "$1" ||
+		return
 }
 
 help_create()
