@@ -189,7 +189,7 @@ update_tag_from_description()
 		return 0
 
 	git config "branch.$1.description" |
-		git tag --annotate --file=- --force "$1/cover" "$commit"
+		git tag --annotate --file=- --force "$1/cover" "$commit^{}"
 }
 
 update_tag()
@@ -340,7 +340,7 @@ cmd_create()
 	[ -n "$mbox" ] || [ -n "$no_edit_cover" ] ||
 		git branch --edit-description ||
 			fatal "unable to change description"
-	update_tag_from_description "patchset/$branchname/$newver"
+	update_tag_from_description "patchset/$branchname/$newver" "HEAD"
 
 	message "new patchset created: patchset/$branchname/$newver"
 }
