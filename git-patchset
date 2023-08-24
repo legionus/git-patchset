@@ -880,7 +880,7 @@ help_version()
 
 cmd_version()
 {
-	local newname='' newver='' branchname='' inc=''
+	local newname='' newver='' branchname='' inc='' latest=''
 
 	while [ "$#" != 0 ]; do
 		local OPTSHIFT='' OPTNAME='' OPTVALUE=''
@@ -909,11 +909,15 @@ cmd_version()
 	[ "$#" -eq 0 ] ||
 		fatal "too many arguments"
 
+	latest="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/${patchset[$P_NAME]}/" |
+		sort --version-sort |
+		tail -1)"
+
+	[ -n "${patchset[$P_VERS]}" ] ||
+		parse_refname patchset "$latest"
+
 	if [ -z "$newver" ]; then
-		newver="$(git for-each-ref --format='%(refname)' "refs/heads/patchset/${patchset[$P_NAME]}/" |
-			sed -e 's/^.*\/[av]//' |
-			sort --version-sort |
-			tail -1)"
+		newver="${latest##*/[av]}"
 		newver="${newver:-1}"
 
 		if [ -z "${newver##*.[0-9]*}" ]; then
